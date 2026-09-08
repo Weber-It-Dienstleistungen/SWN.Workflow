@@ -64,4 +64,28 @@ public sealed class DashboardService : IDashboardService
                 item.CompletedTasks))
             .ToList();
     }
+
+    public async Task<IReadOnlyList<AvailableWorkflowItem>>
+        GetAvailableWorkflowsAsync(
+            CancellationToken cancellationToken = default)
+    {
+        await using var db =
+            await _dbContextFactory.CreateDbContextAsync(
+                cancellationToken);
+
+        return await db.WorkflowDefinitions
+            .AsNoTracking()
+            .Where(definition =>
+                definition.IsActive &&
+                db.WorkflowVersions.Any(
+                    version =>
+                        version.WorkflowDefinitionId == definition.Id &&
+                        version.IsPublished))
+            .OrderBy(definition => definition.Name)
+            .Select(definition => new AvailableWorkflowItem(
+                definition.Key,
+                definition.Name,
+                definition.Description))
+            .ToListAsync(cancellationToken);
+    }
 }

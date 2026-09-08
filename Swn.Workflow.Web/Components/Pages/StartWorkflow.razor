@@ -1,0 +1,209 @@
+﻿@page "/workflow/start/{WorkflowKey}"
+
+@using System.ComponentModel.DataAnnotations
+@using Swn.Workflow.Application
+
+@inject IDashboardService DashboardService
+@inject IWorkflowEngine WorkflowEngine
+@inject NavigationManager Navigation
+
+<PageTitle>Vorgang starten</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="text-secondary">
+        Workflow wird geladen...
+    </div>
+}
+else if (_workflow is null)
+{
+    <div class="alert alert-warning">
+        Die angeforderte Workflow-Vorlage wurde nicht gefunden
+        oder ist nicht veröffentlicht.
+    </div>
+
+    <a class="btn btn-outline-secondary"
+       href="/">
+        Zurück zum Dashboard
+    </a>
+}
+else
+{
+    <div class="mb-4">
+        <a class="text-decoration-none"
+           href="/">
+            ← Zurück zum Dashboard
+        </a>
+    </div>
+
+    <div class="mb-4">
+        <div class="text-secondary small mb-1">
+            Neuen Vorgang starten
+        </div>
+
+        <h1 class="display-6 fw-semibold mb-2">
+            @_workflow.Name
+        </h1>
+
+        @if (!string.IsNullOrWhiteSpace(_workflow.Description))
+        {
+            <p class="text-secondary mb-0">
+                @_workflow.Description
+            </p>
+        }
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-body fw-semibold">
+            Vorgangsdaten
+        </div>
+
+        <div class="card-body">
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div class="alert alert-danger">
+                    @_errorMessage
+                </div>
+            }
+
+            <EditForm Model="_model"
+                      OnValidSubmit="StartAsync">
+
+                <DataAnnotationsValidator />
+
+                <div class="mb-3">
+                    <label class="form-label"
+                           for="subject">
+                        Mitarbeiter / Betreff
+                    </label>
+
+                    <InputText id="subject"
+                               class="form-control"
+                               @bind-Value="_model.Subject" />
+
+                    <ValidationMessage For="@(() => _model.Subject)" />
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label"
+                           for="referenceDate">
+                        Stichtag
+                    </label>
+
+                    <InputDate id="referenceDate"
+                               class="form-control"
+                               @bind-Value="_model.ReferenceDate" />
+
+                    <div class="form-text">
+                        Beispielsweise Eintritts- oder Austrittsdatum.
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary"
+                            type="submit"
+                            disabled="@_isSubmitting">
+                        @if (_isSubmitting)
+                        {
+                            <span>
+                                Vorgang wird angelegt...
+                            </span>
+                        }
+                        else
+                        {
+                            <span>
+                                Vorgang starten
+                            </span>
+                        }
+                    </button>
+
+                    <a class="btn btn-outline-secondary"
+                       href="/">
+                        Abbrechen
+                    </a>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string WorkflowKey { get; set; } = string.Empty;
+
+    private AvailableWorkflowItem? _workflow;
+
+    private StartWorkflowFormModel _model = new();
+
+    private bool _isLoading = true;
+
+    private bool _isSubmitting;
+
+    private string? _errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        var workflows =
+            await DashboardService.GetAvailableWorkflowsAsync();
+
+        _workflow = workflows.FirstOrDefault(
+            workflow =>
+                string.Equals(
+                    workflow.Key,
+                    WorkflowKey,
+                    StringComparison.OrdinalIgnoreCase));
+
+        _isLoading = false;
+    }
+
+    private async Task StartAsync()
+    {
+        if (_workflow is null)
+        {
+            return;
+        }
+
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var request = new StartWorkflowRequest(
+                WorkflowKey: _workflow.Key,
+                Subject: _model.Subject,
+                ReferenceDate: _model.ReferenceDate,
+                CreatedByUserId: "demo-hr-user");
+
+            await WorkflowEngine.StartAsync(request);
+
+            Navigation.NavigateTo("/");
+        }
+        catch
+        {
+            _errorMessage =
+                "Der Vorgang konnte nicht angelegt werden.";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private sealed class StartWorkflowFormModel
+    {
+        [Required(
+            ErrorMessage =
+                "Bitte einen Mitarbeiter oder Betreff angeben.")]
+        [StringLength(
+            300,
+            ErrorMessage =
+                "Der Betreff darf maximal 300 Zeichen lang sein.")]
+        public string Subject { get; set; } = string.Empty;
+
+        public DateOnly ReferenceDate { get; set; } =
+            DateOnly.FromDateTime(DateTime.Today);
+    }
+}
