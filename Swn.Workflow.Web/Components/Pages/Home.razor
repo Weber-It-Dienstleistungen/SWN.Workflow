@@ -1,7 +1,245 @@
 ﻿@page "/"
 
-<PageTitle>Home</PageTitle>
+@using Swn.Workflow.Application
+@inject IDashboardService DashboardService
 
-<h1>Hello, world!</h1>
+<PageTitle>SWN Workflow</PageTitle>
 
-Welcome to your new app.
+<div class="container-fluid px-0">
+    <div class="mb-4">
+        <h1 class="display-6 fw-semibold mb-2">SWN Workflow</h1>
+        <p class="text-secondary mb-0">
+            Zentrale Übersicht für laufende und neue Geschäftsprozesse.
+        </p>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-secondary small mb-2">
+                        Aktive Vorgänge
+                    </div>
+
+                    <div class="fs-2 fw-semibold">
+                        @_activeWorkflows.Count
+                    </div>
+
+                    <div class="text-secondary small">
+                        Aktuell laufende Geschäftsprozesse
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-secondary small mb-2">
+                        Offene Aufgaben
+                    </div>
+
+                    <div class="fs-2 fw-semibold">
+                        @OpenTaskCount
+                    </div>
+
+                    <div class="text-secondary small">
+                        Noch nicht abgeschlossene Aufgaben
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-secondary small mb-2">
+                        Verfügbare Workflows
+                    </div>
+
+                    <div class="fs-2 fw-semibold">
+                        2
+                    </div>
+
+                    <div class="text-secondary small">
+                        Einstellung / Arbeitsplatzwechsel und Austritt / Weggang
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-body fw-semibold">
+                    Aktive Vorgänge
+                </div>
+
+                <div class="card-body p-0">
+                    @if (_isLoading)
+                    {
+                        <div class="text-center text-secondary py-5">
+                            Vorgänge werden geladen...
+                        </div>
+                    }
+                    else if (_activeWorkflows.Count == 0)
+                    {
+                        <div class="text-center py-5">
+                            <h2 class="h5 mb-2">
+                                Keine aktiven Vorgänge
+                            </h2>
+
+                            <p class="text-secondary mb-0">
+                                Sobald ein Workflow gestartet wurde,
+                                erscheint er hier.
+                            </p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var workflow in _activeWorkflows)
+                            {
+                                var progress = GetProgress(workflow);
+
+                                <div class="list-group-item p-4">
+                                    <div class="d-flex flex-column flex-md-row
+                                        justify-content-between gap-3">
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex align-items-center
+                                                gap-2 mb-1">
+                                                <h2 class="h5 mb-0">
+                                                    @workflow.Subject
+                                                </h2>
+
+                                                <span class="badge
+                                                    text-bg-light
+                                                    border">
+                                                    @GetStatusText(workflow.Status)
+                                                </span>
+                                            </div>
+
+                                            <div class="text-secondary mb-2">
+                                                @workflow.WorkflowName
+                                            </div>
+
+                                            <div class="small mb-3">
+                                                Stichtag:
+                                                <strong>
+                                                    @workflow.ReferenceDate.ToString("dd.MM.yyyy")
+                                                </strong>
+                                            </div>
+
+                                            <div class="d-flex
+                                                justify-content-between
+                                                small mb-1">
+                                                <span>Fortschritt</span>
+                                                <span>
+                                                    @workflow.CompletedTasks
+                                                    von
+                                                    @workflow.TotalTasks
+                                                    Aufgaben
+                                                </span>
+                                            </div>
+
+                                            <div class="progress"
+                                                 role="progressbar"
+                                                 aria-valuenow="@progress"
+                                                 aria-valuemin="0"
+                                                 aria-valuemax="100">
+                                                <div class="progress-bar"
+                                                     style="width: @progress%">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex align-items-center">
+                                            <button class="btn btn-outline-primary"
+                                                    type="button"
+                                                    disabled>
+                                                Vorgang öffnen
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-body fw-semibold">
+                    Neuen Vorgang starten
+                </div>
+
+                <div class="card-body d-grid gap-3">
+                    <button class="btn btn-primary"
+                            type="button"
+                            disabled>
+                        Einstellung / Arbeitsplatzwechsel
+                    </button>
+
+                    <button class="btn btn-outline-primary"
+                            type="button"
+                            disabled>
+                        Austritt / Weggang
+                    </button>
+
+                    <div class="text-secondary small">
+                        Die Startmasken werden im nächsten Ausbauschritt
+                        angebunden.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private IReadOnlyList<WorkflowOverviewItem> _activeWorkflows =
+        Array.Empty<WorkflowOverviewItem>();
+
+    private bool _isLoading = true;
+
+    private int OpenTaskCount =>
+        _activeWorkflows.Sum(
+            workflow =>
+                workflow.TotalTasks - workflow.CompletedTasks);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _activeWorkflows =
+            await DashboardService.GetActiveWorkflowsAsync();
+
+        _isLoading = false;
+    }
+
+    private static int GetProgress(
+        WorkflowOverviewItem workflow)
+    {
+        if (workflow.TotalTasks <= 0)
+        {
+            return 0;
+        }
+
+        return (int)Math.Round(
+            workflow.CompletedTasks * 100.0 /
+            workflow.TotalTasks);
+    }
+
+    private static string GetStatusText(int status)
+    {
+        return status switch
+        {
+            0 => "Offen",
+            1 => "In Bearbeitung",
+            2 => "Abgeschlossen",
+            3 => "Abgebrochen",
+            _ => "Unbekannt"
+        };
+    }
+}

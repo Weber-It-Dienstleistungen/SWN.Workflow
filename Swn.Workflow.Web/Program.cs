@@ -14,6 +14,9 @@ builder.Services.AddDataProtection()
 
 builder.Services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
 
+builder.Services.AddScoped<IWorkflowEngine, WorkflowEngine>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+
 var connectionString = builder.Configuration
     .GetConnectionString("WorkflowDatabase")
     ?? throw new InvalidOperationException(
