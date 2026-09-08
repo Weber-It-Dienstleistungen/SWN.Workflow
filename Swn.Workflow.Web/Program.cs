@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Swn.Workflow.Application;
 using Swn.Workflow.Infrastructure;
 using Swn.Workflow.Web.Components;
 
@@ -6,6 +8,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddDataProtection()
+    .SetApplicationName("Swn.Workflow");
+
+builder.Services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
 
 var connectionString = builder.Configuration
     .GetConnectionString("WorkflowDatabase")
@@ -48,6 +55,8 @@ using (var scope = app.Services.CreateScope())
         throw new InvalidOperationException(
             "Connection to the workflow database could not be established.");
     }
+
+    await WorkflowSeedData.InitializeAsync(dbFactory);
 }
 
 app.Run();

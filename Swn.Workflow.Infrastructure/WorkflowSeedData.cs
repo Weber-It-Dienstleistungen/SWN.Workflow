@@ -136,7 +136,7 @@ public static class WorkflowSeedData
             new SeedTask(
                 "ONB-008",
                 "Rechnerzugang einrichten",
-                "Rechnerzugang für den Mitarbeiter einrichten. Zugangspasswörter werden nicht im Workflow gespeichert.",
+                "Rechnerzugang für den Mitarbeiter einrichten. Benutzername und Passwort können im Workflow erfasst werden. Das Passwort wird verschlüsselt gespeichert.",
                 "Vorbereitung vor Eintritt",
                 8,
                 "IT",
@@ -172,7 +172,7 @@ public static class WorkflowSeedData
             new SeedTask(
                 "ONB-012",
                 "Benutzerberechtigung Leitsystem einrichten",
-                "Erforderliche Benutzerberechtigung für das Leitsystem einrichten. Zugangspasswörter werden nicht im Workflow gespeichert.",
+                "Erforderliche Benutzerberechtigung für das Leitsystem einrichten. Benutzername und Passwort können im Workflow erfasst werden. Das Passwort wird verschlüsselt gespeichert.",
                 "Vorbereitung vor Eintritt",
                 12,
                 "IT",
@@ -181,7 +181,7 @@ public static class WorkflowSeedData
             new SeedTask(
                 "ONB-013",
                 "E-Mail-Account einrichten",
-                "E-Mail-Account einrichten. Zugangspasswörter werden nicht im Workflow gespeichert.",
+                "E-Mail-Account einrichten. Benutzername und Passwort können im Workflow erfasst werden. Das Passwort wird verschlüsselt gespeichert.",
                 "Vorbereitung vor Eintritt",
                 13,
                 "IT",
@@ -190,7 +190,7 @@ public static class WorkflowSeedData
             new SeedTask(
                 "ONB-014",
                 "Schleupen-Zugang einrichten",
-                "Erforderlichen Schleupen-Zugang einrichten. Zugangspasswörter werden nicht im Workflow gespeichert.",
+                "Erforderlichen Schleupen-Zugang einrichten. Benutzername und Passwort können im Workflow erfasst werden. Das Passwort wird verschlüsselt gespeichert.",
                 "Vorbereitung vor Eintritt",
                 14,
                 "ORGANIZATION",
