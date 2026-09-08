@@ -36,4 +36,18 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+using (var scope = app.Services.CreateScope())
+{
+    var dbFactory = scope.ServiceProvider
+        .GetRequiredService<IDbContextFactory<WorkflowDbContext>>();
+
+    await using var db = await dbFactory.CreateDbContextAsync();
+
+    if (!await db.Database.CanConnectAsync())
+    {
+        throw new InvalidOperationException(
+            "Connection to the workflow database could not be established.");
+    }
+}
+
 app.Run();
