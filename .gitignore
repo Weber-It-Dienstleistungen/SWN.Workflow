@@ -399,3 +399,8 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Local SQLite database
+workflow.db
+workflow.db-shm
+workflow.db-wal
