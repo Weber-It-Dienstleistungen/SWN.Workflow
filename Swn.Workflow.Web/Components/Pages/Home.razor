@@ -155,11 +155,10 @@
                                         </div>
 
                                         <div class="d-flex align-items-center">
-                                            <button class="btn btn-outline-primary"
-                                                    type="button"
-                                                    disabled>
+                                            <a class="btn btn-outline-primary"
+                                               href="@GetDetailUrl(workflow.Id)">
                                                 Vorgang öffnen
-                                            </button>
+                                            </a>
                                         </div>
                                     </div>
                                 </div>
@@ -245,6 +244,11 @@
     private static string GetStartUrl(string workflowKey)
     {
         return $"/workflow/start/{Uri.EscapeDataString(workflowKey)}";
+    }
+
+    private static string GetDetailUrl(Guid workflowInstanceId)
+    {
+        return $"/workflow/{workflowInstanceId}";
     }
 
     private static int GetProgress(

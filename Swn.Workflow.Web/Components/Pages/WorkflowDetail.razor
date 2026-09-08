@@ -1,0 +1,274 @@
+﻿@page "/workflow/{WorkflowInstanceId:guid}"
+
+@using Swn.Workflow.Application
+@inject IWorkflowDetailService WorkflowDetailService
+
+<PageTitle>Vorgang</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="text-secondary">
+        Vorgang wird geladen...
+    </div>
+}
+else if (_workflow is null)
+{
+    <div class="alert alert-warning">
+        Der angeforderte Vorgang wurde nicht gefunden.
+    </div>
+
+    <a class="btn btn-outline-secondary"
+       href="/">
+        Zurück zum Dashboard
+    </a>
+}
+else
+{
+    var completedTasks = _workflow.Tasks.Count(
+        task =>
+            task.Status == 2 ||
+            task.Status == 4);
+
+    var totalTasks = _workflow.Tasks.Count;
+
+    var progress = totalTasks == 0
+        ? 0
+        : (int)Math.Round(
+            completedTasks * 100.0 / totalTasks);
+
+    <div class="mb-4">
+        <a class="text-decoration-none"
+           href="/">
+            ← Zurück zum Dashboard
+        </a>
+    </div>
+
+    <div class="mb-4">
+        <div class="text-secondary small mb-1">
+            @_workflow.WorkflowName
+        </div>
+
+        <div class="d-flex flex-column flex-md-row
+            justify-content-between gap-3">
+            <div>
+                <h1 class="display-6 fw-semibold mb-2">
+                    @_workflow.Subject
+                </h1>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="badge text-bg-light border">
+                        @GetWorkflowStatusText(_workflow.Status)
+                    </span>
+
+                    <span class="badge text-bg-light border">
+                        Stichtag:
+                        @_workflow.ReferenceDate.ToString("dd.MM.yyyy")
+                    </span>
+                </div>
+            </div>
+
+            <div class="text-md-end">
+                <div class="text-secondary small">
+                    Angelegt am
+                </div>
+
+                <div>
+                    @_workflow.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                </div>
+
+                <div class="text-secondary small mt-2">
+                    Angelegt von
+                </div>
+
+                <div>
+                    @_workflow.CreatedByUserId
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between mb-2">
+                <span class="fw-semibold">
+                    Gesamtfortschritt
+                </span>
+
+                <span>
+                    @completedTasks von @totalTasks Aufgaben
+                </span>
+            </div>
+
+            <div class="progress"
+                 role="progressbar"
+                 aria-valuenow="@progress"
+                 aria-valuemin="0"
+                 aria-valuemax="100">
+                <div class="progress-bar"
+                     style="width: @progress%">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (_workflow.Properties.Count > 0)
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-body fw-semibold">
+                Vorgangsdaten
+            </div>
+
+            <div class="card-body">
+                <dl class="row mb-0">
+                    @foreach (var property in _workflow.Properties)
+                    {
+                        <dt class="col-sm-4">
+                            @property.Key
+                        </dt>
+
+                        <dd class="col-sm-8">
+                            @property.Value
+                        </dd>
+                    }
+                </dl>
+            </div>
+        </div>
+    }
+
+    @foreach (var phase in _workflow.Tasks
+        .GroupBy(task => task.Phase)
+        .OrderBy(group => group.Min(task => task.SortOrder)))
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-body fw-semibold">
+                @phase.Key
+            </div>
+
+            <div class="list-group list-group-flush">
+                @foreach (var task in phase.OrderBy(task => task.SortOrder))
+                {
+                    <div class="list-group-item p-4">
+                        <div class="d-flex flex-column flex-lg-row
+                            justify-content-between gap-3">
+                            <div class="flex-grow-1">
+                                <div class="d-flex flex-wrap
+                                    align-items-center
+                                    gap-2 mb-2">
+                                    <h2 class="h5 mb-0">
+                                        @task.Title
+                                    </h2>
+
+                                    <span class="badge
+                                        @GetTaskStatusBadgeClass(task.Status)">
+                                        @GetTaskStatusText(task.Status)
+                                    </span>
+
+                                    @if (task.IsOptional)
+                                    {
+                                        <span class="badge text-bg-light border">
+                                            Optional
+                                        </span>
+                                    }
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(task.Description))
+                                {
+                                    <p class="text-secondary mb-3">
+                                        @task.Description
+                                    </p>
+                                }
+
+                                <div class="small">
+                                    <span class="text-secondary">
+                                        Zuständige Rolle:
+                                    </span>
+
+                                    <strong>
+                                        @task.AssignedRoleKey
+                                    </strong>
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(task.Comment))
+                                {
+                                    <div class="small mt-2">
+                                        <span class="text-secondary">
+                                            Kommentar:
+                                        </span>
+
+                                        @task.Comment
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="d-flex align-items-start">
+                                <button class="btn btn-outline-primary"
+                                        type="button"
+                                        disabled>
+                                    Aufgabe öffnen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid WorkflowInstanceId { get; set; }
+
+    private WorkflowDetailItem? _workflow;
+
+    private bool _isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+
+        _workflow =
+            await WorkflowDetailService.GetByIdAsync(
+                WorkflowInstanceId);
+
+        _isLoading = false;
+    }
+
+    private static string GetWorkflowStatusText(int status)
+    {
+        return status switch
+        {
+            0 => "Offen",
+            1 => "In Bearbeitung",
+            2 => "Abgeschlossen",
+            3 => "Abgebrochen",
+            _ => "Unbekannt"
+        };
+    }
+
+    private static string GetTaskStatusText(int status)
+    {
+        return status switch
+        {
+            0 => "Offen",
+            1 => "In Bearbeitung",
+            2 => "Erledigt",
+            3 => "Blockiert",
+            4 => "Nicht erforderlich",
+            _ => "Unbekannt"
+        };
+    }
+
+    private static string GetTaskStatusBadgeClass(int status)
+    {
+        return status switch
+        {
+            0 => "text-bg-secondary",
+            1 => "text-bg-primary",
+            2 => "text-bg-success",
+            3 => "text-bg-warning",
+            4 => "text-bg-light border",
+            _ => "text-bg-dark"
+        };
+    }
+}
