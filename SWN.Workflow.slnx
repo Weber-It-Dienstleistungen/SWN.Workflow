@@ -1,1 +1,6 @@
-<Solution />
+<Solution>
+  <Project Path="Swn.Workflow.Application/Swn.Workflow.Application.csproj" />
+  <Project Path="Swn.Workflow.Domain/Swn.Workflow.Domain.csproj" />
+  <Project Path="Swn.Workflow.Infrastructure/Swn.Workflow.Infrastructure.csproj" />
+  <Project Path="Swn.Workflow.Web/Swn.Workflow.Web.csproj" Id="144656bf-8a6c-4965-8410-52f1c8ac11d8" />
+</Solution>
