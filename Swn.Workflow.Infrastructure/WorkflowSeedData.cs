@@ -30,43 +30,17 @@ public static class WorkflowSeedData
 
     private static async Task SeedOnboardingAsync(WorkflowDbContext db)
     {
-        var definitionExists = await db.WorkflowDefinitions
-            .AnyAsync(x => x.Key == "ONBOARDING");
+        var definition = await GetOrCreateWorkflowDefinitionAsync(
+            db,
+            OnboardingDefinitionId,
+            "ONBOARDING",
+            "Einstellung bzw. Arbeitsplatzwechsel",
+            "Workflow für die Einstellung neuer Mitarbeitender oder einen Arbeitsplatzwechsel.");
 
-        if (!definitionExists)
-        {
-            db.WorkflowDefinitions.Add(new WorkflowDefinition
-            {
-                Id = OnboardingDefinitionId,
-                Key = "ONBOARDING",
-                Name = "Einstellung bzw. Arbeitsplatzwechsel",
-                Description =
-                    "Workflow für die Einstellung neuer Mitarbeitender oder einen Arbeitsplatzwechsel.",
-                IsActive = true
-            });
-        }
-
-        var versionExists = await db.WorkflowVersions
-            .AnyAsync(x => x.Id == OnboardingVersionId);
-
-        if (!versionExists)
-        {
-            db.WorkflowVersions.Add(new WorkflowVersion
-            {
-                Id = OnboardingVersionId,
-                WorkflowDefinitionId = OnboardingDefinitionId,
-                VersionNumber = 1,
-                IsPublished = true
-            });
-        }
-
-        var existingTaskKeys = await db.TaskDefinitions
-            .Where(x => x.WorkflowVersionId == OnboardingVersionId)
-            .Select(x => x.Key)
-            .ToListAsync();
-
-        var existingKeys = existingTaskKeys.ToHashSet(
-            StringComparer.OrdinalIgnoreCase);
+        var version = await GetOrCreateWorkflowVersionAsync(
+            db,
+            OnboardingVersionId,
+            definition.Id);
 
         var tasks = new[]
         {
@@ -296,52 +270,25 @@ public static class WorkflowSeedData
                 false)
         };
 
-        AddMissingTasks(
+        await AddOrUpdateTasksAsync(
             db,
-            OnboardingVersionId,
-            tasks,
-            existingKeys);
+            version.Id,
+            tasks);
     }
 
     private static async Task SeedOffboardingAsync(WorkflowDbContext db)
     {
-        var definitionExists = await db.WorkflowDefinitions
-            .AnyAsync(x => x.Key == "OFFBOARDING");
+        var definition = await GetOrCreateWorkflowDefinitionAsync(
+            db,
+            OffboardingDefinitionId,
+            "OFFBOARDING",
+            "Austritt bzw. Weggang",
+            "Workflow für den Austritt oder Weggang von Mitarbeitenden.");
 
-        if (!definitionExists)
-        {
-            db.WorkflowDefinitions.Add(new WorkflowDefinition
-            {
-                Id = OffboardingDefinitionId,
-                Key = "OFFBOARDING",
-                Name = "Austritt bzw. Weggang",
-                Description =
-                    "Workflow für den Austritt oder Weggang von Mitarbeitenden.",
-                IsActive = true
-            });
-        }
-
-        var versionExists = await db.WorkflowVersions
-            .AnyAsync(x => x.Id == OffboardingVersionId);
-
-        if (!versionExists)
-        {
-            db.WorkflowVersions.Add(new WorkflowVersion
-            {
-                Id = OffboardingVersionId,
-                WorkflowDefinitionId = OffboardingDefinitionId,
-                VersionNumber = 1,
-                IsPublished = true
-            });
-        }
-
-        var existingTaskKeys = await db.TaskDefinitions
-            .Where(x => x.WorkflowVersionId == OffboardingVersionId)
-            .Select(x => x.Key)
-            .ToListAsync();
-
-        var existingKeys = existingTaskKeys.ToHashSet(
-            StringComparer.OrdinalIgnoreCase);
+        var version = await GetOrCreateWorkflowVersionAsync(
+            db,
+            OffboardingVersionId,
+            definition.Id);
 
         // Die Positionen 1, 6, 9, 15 und 17 sind im vorliegenden
         // Laufzettel ohne lesbaren Arbeitsschritt und werden deshalb
@@ -467,23 +414,111 @@ public static class WorkflowSeedData
                 true)
         };
 
-        AddMissingTasks(
+        await AddOrUpdateTasksAsync(
             db,
-            OffboardingVersionId,
-            tasks,
-            existingKeys);
+            version.Id,
+            tasks);
     }
 
-    private static void AddMissingTasks(
+    private static async Task<WorkflowDefinition>
+        GetOrCreateWorkflowDefinitionAsync(
+            WorkflowDbContext db,
+            Guid definitionId,
+            string key,
+            string name,
+            string description)
+    {
+        var definition = await db.WorkflowDefinitions
+            .SingleOrDefaultAsync(x => x.Key == key);
+
+        if (definition is null)
+        {
+            definition = new WorkflowDefinition
+            {
+                Id = definitionId,
+                Key = key,
+                Name = name,
+                Description = description,
+                IsActive = true
+            };
+
+            db.WorkflowDefinitions.Add(definition);
+
+            return definition;
+        }
+
+        definition.Name = name;
+        definition.Description = description;
+        definition.IsActive = true;
+
+        return definition;
+    }
+
+    private static async Task<WorkflowVersion>
+        GetOrCreateWorkflowVersionAsync(
+            WorkflowDbContext db,
+            Guid versionId,
+            Guid workflowDefinitionId)
+    {
+        var version = await db.WorkflowVersions
+            .SingleOrDefaultAsync(x => x.Id == versionId);
+
+        if (version is null)
+        {
+            version = await db.WorkflowVersions
+                .SingleOrDefaultAsync(x =>
+                    x.WorkflowDefinitionId == workflowDefinitionId &&
+                    x.VersionNumber == 1);
+        }
+
+        if (version is null)
+        {
+            version = new WorkflowVersion
+            {
+                Id = versionId,
+                WorkflowDefinitionId = workflowDefinitionId,
+                VersionNumber = 1,
+                IsPublished = true
+            };
+
+            db.WorkflowVersions.Add(version);
+
+            return version;
+        }
+
+        version.WorkflowDefinitionId = workflowDefinitionId;
+        version.VersionNumber = 1;
+        version.IsPublished = true;
+
+        return version;
+    }
+
+    private static async Task AddOrUpdateTasksAsync(
         WorkflowDbContext db,
         Guid workflowVersionId,
-        IEnumerable<SeedTask> tasks,
-        HashSet<string> existingKeys)
+        IEnumerable<SeedTask> tasks)
     {
+        var existingTasks = await db.TaskDefinitions
+            .Where(x => x.WorkflowVersionId == workflowVersionId)
+            .ToListAsync();
+
+        var tasksByKey = existingTasks.ToDictionary(
+            x => x.Key,
+            StringComparer.OrdinalIgnoreCase);
+
         foreach (var task in tasks)
         {
-            if (existingKeys.Contains(task.Key))
+            if (tasksByKey.TryGetValue(
+                task.Key,
+                out var existingTask))
             {
+                existingTask.Title = task.Title;
+                existingTask.Description = task.Description;
+                existingTask.Phase = task.Phase;
+                existingTask.SortOrder = task.SortOrder;
+                existingTask.AssignedRoleKey = task.AssignedRoleKey;
+                existingTask.IsOptional = task.IsOptional;
+
                 continue;
             }
 
