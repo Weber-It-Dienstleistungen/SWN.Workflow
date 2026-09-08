@@ -22,6 +22,8 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         string changedByUserId,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(changedByUserId);
+
         var changedBy = changedByUserId.Trim();
 
         if (string.IsNullOrWhiteSpace(changedBy))
@@ -56,6 +58,24 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                 $"Task instance '{taskInstanceId}' was not found.");
         }
 
+        var workflow = await db.WorkflowInstances
+            .SingleOrDefaultAsync(
+                workflow =>
+                    workflow.Id == task.WorkflowInstanceId,
+                cancellationToken);
+
+        if (workflow is null)
+        {
+            throw new InvalidOperationException(
+                $"Workflow instance '{task.WorkflowInstanceId}' was not found.");
+        }
+
+        if (workflow.Status == WorkflowStatus.Cancelled)
+        {
+            throw new InvalidOperationException(
+                "Tasks of a cancelled workflow cannot be changed.");
+        }
+
         task.Status = newStatus;
 
         if (newStatus == WorkflowTaskStatus.Completed)
@@ -67,6 +87,42 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         {
             task.CompletedAt = null;
             task.CompletedByUserId = null;
+        }
+
+        var workflowTasks = await db.TaskInstances
+            .Where(taskInstance =>
+                taskInstance.WorkflowInstanceId == workflow.Id)
+            .ToListAsync(cancellationToken);
+
+        var allTasksCompleted =
+            workflowTasks.Count > 0 &&
+            workflowTasks.All(
+                taskInstance =>
+                    taskInstance.Status ==
+                        WorkflowTaskStatus.Completed ||
+                    taskInstance.Status ==
+                        WorkflowTaskStatus.NotRequired);
+
+        var anyTaskStarted =
+            workflowTasks.Any(
+                taskInstance =>
+                    taskInstance.Status !=
+                        WorkflowTaskStatus.Open);
+
+        if (allTasksCompleted)
+        {
+            workflow.Status = WorkflowStatus.Completed;
+            workflow.CompletedAt ??= DateTime.UtcNow;
+        }
+        else if (anyTaskStarted)
+        {
+            workflow.Status = WorkflowStatus.InProgress;
+            workflow.CompletedAt = null;
+        }
+        else
+        {
+            workflow.Status = WorkflowStatus.Open;
+            workflow.CompletedAt = null;
         }
 
         await db.SaveChangesAsync(cancellationToken);
