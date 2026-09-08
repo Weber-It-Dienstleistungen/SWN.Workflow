@@ -1,7 +1,9 @@
 ﻿@page "/workflow/{WorkflowInstanceId:guid}"
 
 @using Swn.Workflow.Application
+
 @inject IWorkflowDetailService WorkflowDetailService
+@inject IWorkflowTaskService WorkflowTaskService
 
 <PageTitle>Vorgang</PageTitle>
 
@@ -42,6 +44,13 @@ else
             ← Zurück zum Dashboard
         </a>
     </div>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger">
+            @_errorMessage
+        </div>
+    }
 
     <div class="mb-4">
         <div class="text-secondary small mb-1">
@@ -198,14 +207,59 @@ else
                                         @task.Comment
                                     </div>
                                 }
+
+                                @if (task.CompletedAt is not null)
+                                {
+                                    <div class="small mt-2">
+                                        <span class="text-secondary">
+                                            Erledigt:
+                                        </span>
+
+                                        @task.CompletedAt.Value
+                                        .ToLocalTime()
+                                        .ToString("dd.MM.yyyy HH:mm")
+
+                                        @if (!string.IsNullOrWhiteSpace(
+                                            task.CompletedByUserId))
+                                        {
+                                            <span>
+                                                durch @task.CompletedByUserId
+                                            </span>
+                                        }
+                                    </div>
+                                }
                             </div>
 
-                            <div class="d-flex align-items-start">
-                                <button class="btn btn-outline-primary"
-                                        type="button"
-                                        disabled>
-                                    Aufgabe öffnen
-                                </button>
+                            <div style="min-width: 190px;">
+                                <label class="form-label small text-secondary"
+                                       for="@($"status-{task.Id}")">
+                                    Status
+                                </label>
+
+                                <select id="@($"status-{task.Id}")"
+                                        class="form-select form-select-sm"
+                                        value="@task.Status"
+                                        disabled="@(_updatingTaskId == task.Id)"
+                                        @onchange="args =>
+                                                                                UpdateTaskStatusAsync(
+                                                                                    task.Id,
+                                                                                    args)">
+<option value="0">
+                                        Offen
+                                    </option>
+                                    <option value="1">
+                                        In Bearbeitung
+                                    </option>
+                                    <option value="2">
+                                        Erledigt
+                                    </option>
+                                    <option value="3">
+                                        Blockiert
+                                    </option>
+                                    <option value="4">
+                                        Nicht erforderlich
+                                    </option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -223,7 +277,16 @@ else
 
     private bool _isLoading = true;
 
+    private Guid? _updatingTaskId;
+
+    private string? _errorMessage;
+
     protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
     {
         _isLoading = true;
 
@@ -232,6 +295,42 @@ else
                 WorkflowInstanceId);
 
         _isLoading = false;
+    }
+
+    private async Task UpdateTaskStatusAsync(
+        Guid taskInstanceId,
+        ChangeEventArgs args)
+    {
+        if (!int.TryParse(
+            args.Value?.ToString(),
+            out var status))
+        {
+            return;
+        }
+
+        _updatingTaskId = taskInstanceId;
+        _errorMessage = null;
+
+        try
+        {
+            await WorkflowTaskService.UpdateStatusAsync(
+                taskInstanceId,
+                status,
+                "demo-user");
+
+            _workflow =
+                await WorkflowDetailService.GetByIdAsync(
+                    WorkflowInstanceId);
+        }
+        catch
+        {
+            _errorMessage =
+                "Der Aufgabenstatus konnte nicht geändert werden.";
+        }
+        finally
+        {
+            _updatingTaskId = null;
+        }
     }
 
     private static string GetWorkflowStatusText(int status)

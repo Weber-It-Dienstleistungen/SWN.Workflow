@@ -17,6 +17,7 @@ builder.Services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>()
 builder.Services.AddScoped<IWorkflowEngine, WorkflowEngine>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IWorkflowDetailService, WorkflowDetailService>();
+builder.Services.AddScoped<IWorkflowTaskService, WorkflowTaskService>();
 
 var connectionString = builder.Configuration
     .GetConnectionString("WorkflowDatabase")
