@@ -1,0 +1,569 @@
+﻿@page "/tasks"
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Swn.Workflow.Application
+
+@attribute [Authorize]
+
+@inject IMyTaskService MyTaskService
+@inject IWorkflowTaskService WorkflowTaskService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Meine Aufgaben</PageTitle>
+
+<div class="container-fluid px-0">
+
+    <div class="mb-4">
+        <div class="text-secondary small mb-1">
+            Persönlicher Arbeitsbereich
+        </div>
+
+        <h1 class="display-6 fw-semibold mb-2">
+            Meine Aufgaben
+        </h1>
+
+        <p class="text-secondary mb-0">
+            Hier bearbeitest du alle Aufgaben,
+            die dir direkt oder über deine Rollen zugewiesen sind.
+        </p>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-secondary">
+            Aufgaben werden geladen...
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger">
+            @_errorMessage
+        </div>
+    }
+    else if (_tasks.Count == 0)
+    {
+        <div class="card shadow-sm">
+            <div class="card-body text-center py-5">
+                <h2 class="h5 mb-2">
+                    Keine offenen Aufgaben
+                </h2>
+
+                <p class="text-secondary mb-0">
+                    Für deine aktuellen Rollen liegen
+                    momentan keine offenen Aufgaben vor.
+                </p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="mb-3 text-secondary">
+            @_tasks.Count offene
+            @GetTaskCountText(_tasks.Count)
+        </div>
+
+        <div class="d-flex flex-column gap-3">
+
+            @foreach (var task in _tasks)
+            {
+                <div @key="task.Id"
+                     class="card shadow-sm">
+
+                    <div class="card-body p-4">
+
+                        <div class="d-flex
+                            flex-column
+                            flex-xl-row
+                            justify-content-between
+                            gap-4">
+
+                            <div class="flex-grow-1">
+
+                                <div class="d-flex
+                                    flex-wrap
+                                    align-items-center
+                                    gap-2
+                                    mb-2">
+
+                                    <span class="badge text-bg-light border">
+                                        @task.AssignedRoleKey
+                                    </span>
+
+                                    <span class="badge
+                                        @GetStatusBadgeClass(
+                                            task.Status)">
+                                        @GetStatusText(task.Status)
+                                    </span>
+                                </div>
+
+                                <h2 class="h5 mb-1">
+                                    @task.Title
+                                </h2>
+
+                                <div class="text-secondary mb-3">
+                                    @task.WorkflowName
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(
+                                    task.Description))
+                                {
+                                    <p class="mb-4">
+                                        @task.Description
+                                    </p>
+                                }
+
+                                <div class="row g-3 small mb-4">
+
+                                    <div class="col-md-4">
+                                        <span class="text-secondary">
+                                            Mitarbeiter / Betreff
+                                        </span>
+
+                                        <div class="fw-semibold">
+                                            @task.Subject
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <span class="text-secondary">
+                                            Phase
+                                        </span>
+
+                                        <div class="fw-semibold">
+                                            @task.Phase
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <span class="text-secondary">
+                                            Stichtag
+                                        </span>
+
+                                        <div class="fw-semibold">
+                                            @(task.ReferenceDate
+                                                .ToString("dd.MM.yyyy"))
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                                <div>
+                                    <label class="form-label"
+                                           for="@($"comment-{task.Id}")">
+                                        Notiz / Kommentar
+                                    </label>
+
+                                    <textarea id="@($"comment-{task.Id}")"
+                                              class="form-control"
+                                              rows="3"
+                                              maxlength="2000"
+                                              value="@GetCommentDraft(
+                                                                                      task.Id)"
+                                              disabled="@(
+                                              _savingCommentTaskId ==
+                                              task.Id)"
+                                              @oninput="args =>
+                                                                                      SetCommentDraft(
+                                                                                          task.Id,
+                                                                                          args.Value?
+                                                                                              .ToString())">
+</textarea>
+
+                                <div class="d-flex
+                                    justify-content-between
+                                    align-items-center
+                                    gap-3
+                                    mt-2">
+
+                                    <div class="small text-secondary">
+
+                                        @if (_savedCommentTaskId ==
+                                            task.Id)
+                                        {
+                                            <span>
+                                                Notiz gespeichert.
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span>
+                                                @GetCommentLength(
+                                                    task.Id)
+                                                / 2000 Zeichen
+                                            </span>
+                                        }
+
+                                    </div>
+
+                                    <button type="button"
+                                            class="btn
+                                        btn-sm
+                                        btn-outline-secondary"
+                                            disabled="@(
+                                            _savingCommentTaskId ==
+                                            task.Id)"
+                                            @onclick="() =>
+                                                                                            SaveCommentAsync(
+                                                                                                task.Id)">
+
+                                            @if (_savingCommentTaskId ==
+                                                task.Id)
+                                        {
+                                            <span>
+                                                Speichern...
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span>
+                                                Notiz speichern
+                                            </span>
+                                        }
+
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="min-width: 210px;">
+
+                            <label class="form-label
+                                small
+                                text-secondary"
+                                   for="@($"status-{task.Id}")">
+                                Status
+                            </label>
+
+                            <select id="@($"status-{task.Id}")"
+                                    class="form-select"
+                                    value="@task.Status"
+                                    disabled="@(
+                                    _updatingTaskId ==
+                                    task.Id)"
+                                    @onchange="args =>
+                                                                            UpdateTaskStatusAsync(
+                                                                                task.Id,
+                                                                                args)">
+
+<option value="0">
+                                    Offen
+                                </option>
+
+                                <option value="1">
+                                    In Bearbeitung
+                                </option>
+
+                                <option value="2">
+                                    Erledigt
+                                </option>
+
+                                <option value="3">
+                                    Blockiert
+                                </option>
+
+                                <option value="4">
+                                    Nicht erforderlich
+                                </option>
+
+                            </select>
+
+                            <div class="small text-secondary mt-2">
+                                Erledigte oder nicht erforderliche
+                                Aufgaben verschwinden aus dieser Liste.
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        }
+
+    </div>
+}
+</div>
+
+@code {
+    private IReadOnlyList<MyTaskItem> _tasks =
+        Array.Empty<MyTaskItem>();
+
+    private readonly Dictionary<Guid, string> _commentDrafts =
+        new();
+
+    private IReadOnlyCollection<string> _currentRoleKeys =
+        Array.Empty<string>();
+
+    private string? _currentUserId;
+
+    private bool _isLoading = true;
+
+    private Guid? _updatingTaskId;
+
+    private Guid? _savingCommentTaskId;
+
+    private Guid? _savedCommentTaskId;
+
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+
+        try
+        {
+            var authenticationState =
+                await AuthenticationStateProvider
+                    .GetAuthenticationStateAsync();
+
+            var user =
+                authenticationState.User;
+
+            _currentUserId =
+                user.FindFirst(
+                    ClaimTypes.NameIdentifier)?
+                    .Value;
+
+            if (string.IsNullOrWhiteSpace(
+                _currentUserId))
+            {
+                throw new InvalidOperationException(
+                    "Der angemeldete Benutzer konnte nicht ermittelt werden.");
+            }
+
+            _currentRoleKeys =
+                user.Claims
+                    .Where(claim =>
+                        claim.Type ==
+                        ClaimTypes.Role)
+                    .Select(claim =>
+                        claim.Value)
+                    .Where(role =>
+                        !string.IsNullOrWhiteSpace(
+                            role))
+                    .Distinct(
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+
+            await ReloadTasksAsync();
+
+            ResetCommentDrafts();
+        }
+        catch
+        {
+            _errorMessage =
+                "Die persönlichen Aufgaben konnten nicht geladen werden.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ReloadTasksAsync()
+    {
+        if (string.IsNullOrWhiteSpace(
+            _currentUserId))
+        {
+            throw new InvalidOperationException(
+                "Der angemeldete Benutzer konnte nicht ermittelt werden.");
+        }
+
+        _tasks =
+            await MyTaskService
+                .GetOpenTasksAsync(
+                    _currentUserId,
+                    _currentRoleKeys);
+    }
+
+    private async Task UpdateTaskStatusAsync(
+        Guid taskInstanceId,
+        ChangeEventArgs args)
+    {
+        if (!int.TryParse(
+            args.Value?.ToString(),
+            out var status))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(
+            _currentUserId))
+        {
+            _errorMessage =
+                "Der angemeldete Benutzer konnte nicht ermittelt werden.";
+
+            return;
+        }
+
+        _updatingTaskId =
+            taskInstanceId;
+
+        _errorMessage = null;
+        _savedCommentTaskId = null;
+
+        try
+        {
+            await WorkflowTaskService
+                .UpdateStatusAsync(
+                    taskInstanceId,
+                    status,
+                    _currentUserId);
+
+            await ReloadTasksAsync();
+
+            EnsureCommentDrafts();
+        }
+        catch
+        {
+            _errorMessage =
+                "Der Aufgabenstatus konnte nicht geändert werden.";
+        }
+        finally
+        {
+            _updatingTaskId = null;
+        }
+    }
+
+    private async Task SaveCommentAsync(
+        Guid taskInstanceId)
+    {
+        _savingCommentTaskId =
+            taskInstanceId;
+
+        _savedCommentTaskId = null;
+        _errorMessage = null;
+
+        try
+        {
+            _commentDrafts.TryGetValue(
+                taskInstanceId,
+                out var comment);
+
+            await WorkflowTaskService
+                .UpdateCommentAsync(
+                    taskInstanceId,
+                    comment);
+
+            await ReloadTasksAsync();
+
+            var savedTask =
+                _tasks.FirstOrDefault(
+                    task =>
+                        task.Id ==
+                        taskInstanceId);
+
+            _commentDrafts[taskInstanceId] =
+                savedTask?.Comment ??
+                string.Empty;
+
+            _savedCommentTaskId =
+                taskInstanceId;
+        }
+        catch
+        {
+            _errorMessage =
+                "Die Notiz konnte nicht gespeichert werden.";
+        }
+        finally
+        {
+            _savingCommentTaskId = null;
+        }
+    }
+
+    private void ResetCommentDrafts()
+    {
+        _commentDrafts.Clear();
+
+        foreach (var task in _tasks)
+        {
+            _commentDrafts[task.Id] =
+                task.Comment ??
+                string.Empty;
+        }
+    }
+
+    private void EnsureCommentDrafts()
+    {
+        foreach (var task in _tasks)
+        {
+            if (!_commentDrafts
+                .ContainsKey(task.Id))
+            {
+                _commentDrafts[task.Id] =
+                    task.Comment ??
+                    string.Empty;
+            }
+        }
+    }
+
+    private void SetCommentDraft(
+        Guid taskInstanceId,
+        string? value)
+    {
+        _commentDrafts[taskInstanceId] =
+            value ??
+            string.Empty;
+
+        if (_savedCommentTaskId ==
+            taskInstanceId)
+        {
+            _savedCommentTaskId = null;
+        }
+    }
+
+    private string GetCommentDraft(
+        Guid taskInstanceId)
+    {
+        return _commentDrafts
+            .TryGetValue(
+                taskInstanceId,
+                out var value)
+            ? value
+            : string.Empty;
+    }
+
+    private int GetCommentLength(
+        Guid taskInstanceId)
+    {
+        return GetCommentDraft(
+            taskInstanceId)
+            .Length;
+    }
+
+    private static string GetTaskCountText(
+        int count)
+    {
+        return count == 1
+            ? "Aufgabe"
+            : "Aufgaben";
+    }
+
+    private static string GetStatusText(
+        int status)
+    {
+        return status switch
+        {
+            0 => "Offen",
+            1 => "In Bearbeitung",
+            2 => "Erledigt",
+            3 => "Blockiert",
+            4 => "Nicht erforderlich",
+            _ => "Unbekannt"
+        };
+    }
+
+    private static string GetStatusBadgeClass(
+        int status)
+    {
+        return status switch
+        {
+            0 => "text-bg-secondary",
+            1 => "text-bg-primary",
+            2 => "text-bg-success",
+            3 => "text-bg-warning",
+            4 => "text-bg-light border",
+            _ => "text-bg-dark"
+        };
+    }
+}

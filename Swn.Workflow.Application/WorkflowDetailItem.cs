@@ -9,5 +9,7 @@ public sealed record WorkflowDetailItem(
     DateTime CreatedAt,
     string CreatedByUserId,
     DateTime? CompletedAt,
+    int TotalTasks,
+    int CompletedTasks,
     IReadOnlyDictionary<string, string> Properties,
     IReadOnlyList<WorkflowTaskDetailItem> Tasks);

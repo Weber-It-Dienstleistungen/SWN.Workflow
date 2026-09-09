@@ -1,9 +1,15 @@
 ﻿@page "/workflow/{WorkflowInstanceId:guid}"
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Swn.Workflow.Application
+
+@attribute [Authorize]
 
 @inject IWorkflowDetailService WorkflowDetailService
 @inject IWorkflowTaskService WorkflowTaskService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Vorgang</PageTitle>
 
@@ -26,17 +32,11 @@ else if (_workflow is null)
 }
 else
 {
-    var completedTasks = _workflow.Tasks.Count(
-        task =>
-            task.Status == 2 ||
-            task.Status == 4);
-
-    var totalTasks = _workflow.Tasks.Count;
-
-    var progress = totalTasks == 0
+    var progress = _workflow.TotalTasks == 0
         ? 0
         : (int)Math.Round(
-            completedTasks * 100.0 / totalTasks);
+            _workflow.CompletedTasks * 100.0 /
+            _workflow.TotalTasks);
 
     <div class="mb-4">
         <a class="text-decoration-none"
@@ -59,6 +59,7 @@ else
 
         <div class="d-flex flex-column flex-md-row
             justify-content-between gap-3">
+
             <div>
                 <h1 class="display-6 fw-semibold mb-2">
                     @_workflow.Subject
@@ -71,7 +72,7 @@ else
 
                     <span class="badge text-bg-light border">
                         Stichtag:
-                        @_workflow.ReferenceDate.ToString("dd.MM.yyyy")
+                        @(_workflow.ReferenceDate.ToString("dd.MM.yyyy"))
                     </span>
                 </div>
             </div>
@@ -82,9 +83,9 @@ else
                 </div>
 
                 <div>
-                    @_workflow.CreatedAt
-                    .ToLocalTime()
-                    .ToString("dd.MM.yyyy HH:mm")
+                    @(_workflow.CreatedAt
+                        .ToLocalTime()
+                        .ToString("dd.MM.yyyy HH:mm"))
                 </div>
 
                 <div class="text-secondary small mt-2">
@@ -98,6 +99,14 @@ else
         </div>
     </div>
 
+    @if (!_includeAllTasks)
+    {
+        <div class="alert alert-info">
+            Du siehst in diesem Vorgang nur Aufgaben,
+            die dir direkt oder über deine Rollen zugewiesen sind.
+        </div>
+    }
+
     <div class="card shadow-sm mb-4">
         <div class="card-body">
             <div class="d-flex justify-content-between mb-2">
@@ -106,7 +115,10 @@ else
                 </span>
 
                 <span>
-                    @completedTasks von @totalTasks Aufgaben
+                    @_workflow.CompletedTasks
+                    von
+                    @_workflow.TotalTasks
+                    Aufgaben
                 </span>
             </div>
 
@@ -115,6 +127,7 @@ else
                  aria-valuenow="@progress"
                  aria-valuemin="0"
                  aria-valuemax="100">
+
                 <div class="progress-bar"
                      style="width: @progress%">
                 </div>
@@ -146,190 +159,233 @@ else
         </div>
     }
 
-    @foreach (var phase in _workflow.Tasks
-        .GroupBy(task => task.Phase)
-        .OrderBy(group => group.Min(task => task.SortOrder)))
+    @if (_workflow.Tasks.Count == 0)
     {
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-body fw-semibold">
-                @phase.Key
+        <div class="card shadow-sm">
+            <div class="card-body text-center py-5">
+                <h2 class="h5 mb-2">
+                    Keine zugewiesenen Aufgaben
+                </h2>
+
+                <p class="text-secondary mb-0">
+                    In diesem Vorgang sind dir aktuell
+                    keine Aufgaben zugewiesen.
+                </p>
             </div>
+        </div>
+    }
+    else
+    {
+        @foreach (var phase in _workflow.Tasks
+            .GroupBy(task => task.Phase)
+            .OrderBy(group =>
+                group.Min(task => task.SortOrder)))
+        {
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-body fw-semibold">
+                    @phase.Key
+                </div>
 
-            <div class="list-group list-group-flush">
-                @foreach (var task in phase.OrderBy(task => task.SortOrder))
-                {
-                    <div class="list-group-item p-4">
-                        <div class="d-flex flex-column flex-lg-row
-                            justify-content-between gap-3">
+                <div class="list-group list-group-flush">
+                    @foreach (var task in phase
+                        .OrderBy(task => task.SortOrder))
+                    {
+                        <div class="list-group-item p-4">
+                            <div class="d-flex
+                                flex-column
+                                flex-lg-row
+                                justify-content-between
+                                gap-3">
 
-                            <div class="flex-grow-1">
-                                <div class="d-flex flex-wrap
-                                    align-items-center
-                                    gap-2 mb-2">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex
+                                        flex-wrap
+                                        align-items-center
+                                        gap-2 mb-2">
 
-                                    <h2 class="h5 mb-0">
-                                        @task.Title
-                                    </h2>
+                                        <h2 class="h5 mb-0">
+                                            @task.Title
+                                        </h2>
 
-                                    <span class="badge
-                                        @GetTaskStatusBadgeClass(task.Status)">
-                                        @GetTaskStatusText(task.Status)
-                                    </span>
-
-                                    @if (task.IsOptional)
-                                    {
-                                        <span class="badge text-bg-light border">
-                                            Optional
-                                        </span>
-                                    }
-                                </div>
-
-                                @if (!string.IsNullOrWhiteSpace(
-                                    task.Description))
-                                {
-                                    <p class="text-secondary mb-3">
-                                        @task.Description
-                                    </p>
-                                }
-
-                                <div class="small">
-                                    <span class="text-secondary">
-                                        Zuständige Rolle:
-                                    </span>
-
-                                    <strong>
-                                        @task.AssignedRoleKey
-                                    </strong>
-                                </div>
-
-                                @if (task.CompletedAt is not null)
-                                {
-                                    <div class="small mt-2">
-                                        <span class="text-secondary">
-                                            Erledigt:
+                                        <span class="badge
+                                            @GetTaskStatusBadgeClass(
+                                                task.Status)">
+                                            @GetTaskStatusText(task.Status)
                                         </span>
 
-                                        @task.CompletedAt.Value
-                                        .ToLocalTime()
-                                        .ToString("dd.MM.yyyy HH:mm")
-
-                                        @if (!string.IsNullOrWhiteSpace(
-                                            task.CompletedByUserId))
+                                        @if (task.IsOptional)
                                         {
-                                            <span>
-                                                durch @task.CompletedByUserId
+                                            <span class="badge
+                                                text-bg-light
+                                                border">
+                                                Optional
                                             </span>
                                         }
                                     </div>
-                                }
 
-                                <div class="mt-3">
-                                    <label class="form-label small"
-                                           for="@($"comment-{task.Id}")">
-                                        Notiz / Kommentar
-                                    </label>
+                                    @if (!string.IsNullOrWhiteSpace(
+                                        task.Description))
+                                    {
+                                        <p class="text-secondary mb-3">
+                                            @task.Description
+                                        </p>
+                                    }
 
-                                    <textarea id="@($"comment-{task.Id}")"
-                                              class="form-control"
-                                              rows="2"
-                                              maxlength="2000"
-                                              value="@GetCommentDraft(task.Id)"
-                                              disabled="@(_savingCommentTaskId == task.Id)"
-                                              @oninput="args =>
-                                                                                      SetCommentDraft(
-                                                                                          task.Id,
-                                                                                          args.Value?.ToString())">
+                                    <div class="small">
+                                        <span class="text-secondary">
+                                            Zuständige Rolle:
+                                        </span>
+
+                                        <strong>
+                                            @task.AssignedRoleKey
+                                        </strong>
+                                    </div>
+
+                                    @if (task.CompletedAt is not null)
+                                    {
+                                        <div class="small mt-2">
+                                            <span class="text-secondary">
+                                                Erledigt:
+                                            </span>
+
+                                            @(task.CompletedAt.Value
+                                                .ToLocalTime()
+                                                .ToString(
+                                                    "dd.MM.yyyy HH:mm"))
+
+                                            @if (!string.IsNullOrWhiteSpace(
+                                                task.CompletedByUserId))
+                                            {
+                                                <span>
+                                                    durch
+                                                    @task.CompletedByUserId
+                                                </span>
+                                            }
+                                        </div>
+                                    }
+
+                                    <div class="mt-3">
+                                        <label class="form-label small"
+                                               for="@($"comment-{task.Id}")">
+                                            Notiz / Kommentar
+                                        </label>
+
+                                        <textarea id="@($"comment-{task.Id}")"
+                                                  class="form-control"
+                                                  rows="2"
+                                                  maxlength="2000"
+                                                  value="@GetCommentDraft(
+                                                                                              task.Id)"
+                                                  disabled="@(
+                                                  _savingCommentTaskId ==
+                                                  task.Id)"
+                                                  @oninput="args =>
+                                                                                              SetCommentDraft(
+                                                                                                  task.Id,
+                                                                                                  args.Value?
+                                                                                                      .ToString())">
 </textarea>
 
-                                <div class="d-flex
-                                    justify-content-between
-                                    align-items-center
-                                    gap-2 mt-2">
+                                    <div class="d-flex
+                                        justify-content-between
+                                        align-items-center
+                                        gap-2 mt-2">
 
-                                    <div class="small text-secondary">
-                                        @if (_savedCommentTaskId == task.Id)
-                                        {
-                                            <span>
-                                                Notiz gespeichert.
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <span>
-                                                @GetCommentLength(task.Id)
-                                                / 2000 Zeichen
-                                            </span>
-                                        }
+                                        <div class="small
+                                            text-secondary">
+                                            @if (_savedCommentTaskId ==
+                                                task.Id)
+                                            {
+                                                <span>
+                                                    Notiz gespeichert.
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span>
+                                                    @GetCommentLength(
+                                                        task.Id)
+                                                    / 2000 Zeichen
+                                                </span>
+                                            }
+                                        </div>
+
+                                        <button class="btn
+                                            btn-sm
+                                            btn-outline-secondary"
+                                                type="button"
+                                                disabled="@(
+                                                _savingCommentTaskId ==
+                                                task.Id)"
+                                                @onclick="() =>
+                                                                                                    SaveCommentAsync(
+                                                                                                        task.Id)">
+
+                                                @if (_savingCommentTaskId ==
+                                                    task.Id)
+                                            {
+                                                <span>
+                                                    Speichern...
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span>
+                                                    Notiz speichern
+                                                </span>
+                                            }
+                                        </button>
                                     </div>
-
-                                    <button class="btn
-                                        btn-sm
-                                        btn-outline-secondary"
-                                            type="button"
-                                            disabled="@(_savingCommentTaskId == task.Id)"
-                                            @onclick="() =>
-                                                                                            SaveCommentAsync(task.Id)">
-                                            @if (_savingCommentTaskId == task.Id)
-                                        {
-                                            <span>
-                                                Speichern...
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <span>
-                                                Notiz speichern
-                                            </span>
-                                        }
-                                    </button>
                                 </div>
                             </div>
-                        </div>
 
-                        <div style="min-width: 190px;">
-                            <label class="form-label
-                                small
-                                text-secondary"
-                                   for="@($"status-{task.Id}")">
-                                Status
-                            </label>
+                            <div style="min-width: 190px;">
+                                <label class="form-label
+                                    small
+                                    text-secondary"
+                                       for="@($"status-{task.Id}")">
+                                    Status
+                                </label>
 
-                            <select id="@($"status-{task.Id}")"
-                                    class="form-select
-                                form-select-sm"
-                                    value="@task.Status"
-                                    disabled="@(_updatingTaskId == task.Id)"
-                                    @onchange="args =>
-                                                                            UpdateTaskStatusAsync(
-                                                                                task.Id,
-                                                                                args)">
+                                <select id="@($"status-{task.Id}")"
+                                        class="form-select
+                                    form-select-sm"
+                                        value="@task.Status"
+                                        disabled="@(
+                                        _updatingTaskId ==
+                                        task.Id)"
+                                        @onchange="args =>
+                                                                                    UpdateTaskStatusAsync(
+                                                                                        task.Id,
+                                                                                        args)">
 
 <option value="0">
-                                    Offen
-                                </option>
+                                        Offen
+                                    </option>
 
-                                <option value="1">
-                                    In Bearbeitung
-                                </option>
+                                    <option value="1">
+                                        In Bearbeitung
+                                    </option>
 
-                                <option value="2">
-                                    Erledigt
-                                </option>
+                                    <option value="2">
+                                        Erledigt
+                                    </option>
 
-                                <option value="3">
-                                    Blockiert
-                                </option>
+                                    <option value="3">
+                                        Blockiert
+                                    </option>
 
-                                <option value="4">
-                                    Nicht erforderlich
-                                </option>
-                            </select>
+                                    <option value="4">
+                                        Nicht erforderlich
+                                    </option>
+                                </select>
+                            </div>
                         </div>
                     </div>
-                </div>
-            }
+                }
+            </div>
         </div>
-    </div>
+    }
 }
 }
 
@@ -341,6 +397,13 @@ else
 
     private readonly Dictionary<Guid, string> _commentDrafts =
         new();
+
+    private IReadOnlyCollection<string> _currentRoleKeys =
+        Array.Empty<string>();
+
+    private string? _currentUserId;
+
+    private bool _includeAllTasks;
 
     private bool _isLoading = true;
 
@@ -362,22 +425,87 @@ else
         _isLoading = true;
         _errorMessage = null;
 
-        _workflow =
-            await WorkflowDetailService.GetByIdAsync(
-                WorkflowInstanceId);
-
-        _commentDrafts.Clear();
-
-        if (_workflow is not null)
+        try
         {
-            foreach (var task in _workflow.Tasks)
+            var authenticationState =
+                await AuthenticationStateProvider
+                    .GetAuthenticationStateAsync();
+
+            var user =
+                authenticationState.User;
+
+            _currentUserId =
+                user.FindFirst(
+                    ClaimTypes.NameIdentifier)?
+                    .Value;
+
+            if (string.IsNullOrWhiteSpace(
+                _currentUserId))
             {
-                _commentDrafts[task.Id] =
-                    task.Comment ?? string.Empty;
+                throw new InvalidOperationException(
+                    "Der angemeldete Benutzer konnte nicht ermittelt werden.");
+            }
+
+            _currentRoleKeys =
+                user.Claims
+                    .Where(claim =>
+                        claim.Type ==
+                        ClaimTypes.Role)
+                    .Select(claim =>
+                        claim.Value)
+                    .Where(role =>
+                        !string.IsNullOrWhiteSpace(
+                            role))
+                    .Distinct(
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+
+            _includeAllTasks =
+                user.IsInRole("HR");
+
+            await ReloadWorkflowAsync();
+
+            _commentDrafts.Clear();
+
+            if (_workflow is not null)
+            {
+                foreach (var task in _workflow.Tasks)
+                {
+                    _commentDrafts[task.Id] =
+                        task.Comment ??
+                        string.Empty;
+                }
             }
         }
+        catch
+        {
+            _workflow = null;
 
-        _isLoading = false;
+            _errorMessage =
+                "Der Vorgang konnte nicht geladen werden.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ReloadWorkflowAsync()
+    {
+        if (string.IsNullOrWhiteSpace(
+            _currentUserId))
+        {
+            throw new InvalidOperationException(
+                "Der angemeldete Benutzer konnte nicht ermittelt werden.");
+        }
+
+        _workflow =
+            await WorkflowDetailService
+                .GetForUserAsync(
+                    WorkflowInstanceId,
+                    _currentUserId,
+                    _currentRoleKeys,
+                    _includeAllTasks);
     }
 
     private async Task UpdateTaskStatusAsync(
@@ -391,20 +519,30 @@ else
             return;
         }
 
-        _updatingTaskId = taskInstanceId;
+        if (string.IsNullOrWhiteSpace(
+            _currentUserId))
+        {
+            _errorMessage =
+                "Der angemeldete Benutzer konnte nicht ermittelt werden.";
+
+            return;
+        }
+
+        _updatingTaskId =
+            taskInstanceId;
+
         _errorMessage = null;
         _savedCommentTaskId = null;
 
         try
         {
-            await WorkflowTaskService.UpdateStatusAsync(
-                taskInstanceId,
-                status,
-                "demo-user");
+            await WorkflowTaskService
+                .UpdateStatusAsync(
+                    taskInstanceId,
+                    status,
+                    _currentUserId);
 
-            _workflow =
-                await WorkflowDetailService.GetByIdAsync(
-                    WorkflowInstanceId);
+            await ReloadWorkflowAsync();
 
             EnsureCommentDrafts();
         }
@@ -422,7 +560,9 @@ else
     private async Task SaveCommentAsync(
         Guid taskInstanceId)
     {
-        _savingCommentTaskId = taskInstanceId;
+        _savingCommentTaskId =
+            taskInstanceId;
+
         _savedCommentTaskId = null;
         _errorMessage = null;
 
@@ -432,22 +572,27 @@ else
                 taskInstanceId,
                 out var comment);
 
-            await WorkflowTaskService.UpdateCommentAsync(
-                taskInstanceId,
-                comment);
+            await WorkflowTaskService
+                .UpdateCommentAsync(
+                    taskInstanceId,
+                    comment);
 
-            _workflow =
-                await WorkflowDetailService.GetByIdAsync(
-                    WorkflowInstanceId);
+            await ReloadWorkflowAsync();
 
             var savedTask =
-                _workflow?.Tasks.FirstOrDefault(
-                    task => task.Id == taskInstanceId);
+                _workflow?
+                    .Tasks
+                    .FirstOrDefault(
+                        task =>
+                            task.Id ==
+                            taskInstanceId);
 
             _commentDrafts[taskInstanceId] =
-                savedTask?.Comment ?? string.Empty;
+                savedTask?.Comment ??
+                string.Empty;
 
-            _savedCommentTaskId = taskInstanceId;
+            _savedCommentTaskId =
+                taskInstanceId;
         }
         catch
         {
@@ -465,9 +610,11 @@ else
         string? value)
     {
         _commentDrafts[taskInstanceId] =
-            value ?? string.Empty;
+            value ??
+            string.Empty;
 
-        if (_savedCommentTaskId == taskInstanceId)
+        if (_savedCommentTaskId ==
+            taskInstanceId)
         {
             _savedCommentTaskId = null;
         }
@@ -476,9 +623,10 @@ else
     private string GetCommentDraft(
         Guid taskInstanceId)
     {
-        return _commentDrafts.TryGetValue(
-            taskInstanceId,
-            out var value)
+        return _commentDrafts
+            .TryGetValue(
+                taskInstanceId,
+                out var value)
             ? value
             : string.Empty;
     }
@@ -486,7 +634,9 @@ else
     private int GetCommentLength(
         Guid taskInstanceId)
     {
-        return GetCommentDraft(taskInstanceId).Length;
+        return GetCommentDraft(
+            taskInstanceId)
+            .Length;
     }
 
     private void EnsureCommentDrafts()
@@ -498,15 +648,18 @@ else
 
         foreach (var task in _workflow.Tasks)
         {
-            if (!_commentDrafts.ContainsKey(task.Id))
+            if (!_commentDrafts
+                .ContainsKey(task.Id))
             {
                 _commentDrafts[task.Id] =
-                    task.Comment ?? string.Empty;
+                    task.Comment ??
+                    string.Empty;
             }
         }
     }
 
-    private static string GetWorkflowStatusText(int status)
+    private static string GetWorkflowStatusText(
+        int status)
     {
         return status switch
         {
@@ -518,7 +671,8 @@ else
         };
     }
 
-    private static string GetTaskStatusText(int status)
+    private static string GetTaskStatusText(
+        int status)
     {
         return status switch
         {
@@ -531,7 +685,8 @@ else
         };
     }
 
-    private static string GetTaskStatusBadgeClass(int status)
+    private static string GetTaskStatusBadgeClass(
+        int status)
     {
         return status switch
         {
