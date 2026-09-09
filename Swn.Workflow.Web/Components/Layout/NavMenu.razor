@@ -1,4 +1,6 @@
-﻿<div class="top-row">
+﻿@using Microsoft.AspNetCore.Components.Authorization
+
+<div class="top-row">
     <a class="brand-link" href="">
         <img src="/images/swn-logo.png"
              alt="SWN Stadtwerke Neustadt"
@@ -12,6 +14,7 @@
 
 <div class="nav-scrollable"
      onclick="document.querySelector('.navbar-toggler').click()">
+
     <nav class="nav flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link"
@@ -22,5 +25,51 @@
                 Dashboard
             </NavLink>
         </div>
+
+        <AuthorizeView>
+            <Authorized Context="authContext">
+                <div class="px-3 mt-3">
+                    <div class="small text-white-50">
+                        Angemeldet als
+                    </div>
+
+                    <div class="fw-semibold text-white">
+                        @authContext.User.Identity?.Name
+                    </div>
+
+                    <form method="post"
+                          action="/account/logout"
+                          class="mt-2">
+
+                        <AntiforgeryToken />
+
+                        <button type="submit"
+                                class="btn btn-sm btn-outline-light">
+                            Abmelden
+                        </button>
+                    </form>
+                </div>
+            </Authorized>
+
+            <NotAuthorized>
+                <div class="nav-item px-3 mt-2">
+                    <NavLink class="nav-link"
+                             href="login">
+                        Anmelden
+                    </NavLink>
+                </div>
+            </NotAuthorized>
+        </AuthorizeView>
+
+        <AuthorizeView Roles="HR"
+                       Context="hrContext">
+            <Authorized>
+                <div class="px-3 mt-2">
+                    <span class="badge text-bg-success">
+                        Rolle HR erkannt
+                    </span>
+                </div>
+            </Authorized>
+        </AuthorizeView>
     </nav>
 </div>

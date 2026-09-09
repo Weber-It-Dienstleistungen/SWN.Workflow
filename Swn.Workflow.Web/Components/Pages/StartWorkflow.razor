@@ -1,11 +1,17 @@
 ﻿@page "/workflow/start/{WorkflowKey}"
 
 @using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Swn.Workflow.Application
+
+@attribute [Authorize(Roles = "HR")]
 
 @inject IDashboardService DashboardService
 @inject IWorkflowEngine WorkflowEngine
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Vorgang starten</PageTitle>
 
@@ -171,11 +177,26 @@ else
 
         try
         {
+            var authenticationState =
+                await AuthenticationStateProvider
+                    .GetAuthenticationStateAsync();
+
+            var userId =
+                authenticationState.User
+                    .FindFirst(ClaimTypes.NameIdentifier)?
+                    .Value;
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                throw new InvalidOperationException(
+                    "Der angemeldete Benutzer konnte nicht ermittelt werden.");
+            }
+
             var request = new StartWorkflowRequest(
                 WorkflowKey: _workflow.Key,
                 Subject: _model.Subject,
                 ReferenceDate: _model.ReferenceDate,
-                CreatedByUserId: "demo-hr-user");
+                CreatedByUserId: userId);
 
             await WorkflowEngine.StartAsync(request);
 

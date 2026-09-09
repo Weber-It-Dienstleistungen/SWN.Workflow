@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -67,6 +68,59 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 
+app.MapPost(
+    "/account/login",
+    async (
+        HttpContext httpContext,
+        SignInManager<ApplicationUser> signInManager,
+        IAntiforgery antiforgery) =>
+    {
+        await antiforgery.ValidateRequestAsync(httpContext);
+
+        var form =
+            await httpContext.Request.ReadFormAsync();
+
+        var userName =
+            form["userName"].ToString().Trim();
+
+        var password =
+            form["password"].ToString();
+
+        if (string.IsNullOrWhiteSpace(userName) ||
+            string.IsNullOrWhiteSpace(password))
+        {
+            return Results.Redirect("/login");
+        }
+
+        var result =
+            await signInManager.PasswordSignInAsync(
+                userName,
+                password,
+                isPersistent: false,
+                lockoutOnFailure: false);
+
+        if (!result.Succeeded)
+        {
+            return Results.Redirect("/login");
+        }
+
+        return Results.Redirect("/");
+    });
+
+app.MapPost(
+    "/account/logout",
+    async (
+        HttpContext httpContext,
+        SignInManager<ApplicationUser> signInManager,
+        IAntiforgery antiforgery) =>
+    {
+        await antiforgery.ValidateRequestAsync(httpContext);
+
+        await signInManager.SignOutAsync();
+
+        return Results.Redirect("/login");
+    });
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
@@ -75,7 +129,8 @@ using (var scope = app.Services.CreateScope())
     var dbFactory = scope.ServiceProvider
         .GetRequiredService<IDbContextFactory<WorkflowDbContext>>();
 
-    await using var db = await dbFactory.CreateDbContextAsync();
+    await using var db =
+        await dbFactory.CreateDbContextAsync();
 
     if (!await db.Database.CanConnectAsync())
     {

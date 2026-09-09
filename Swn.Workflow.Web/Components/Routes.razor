@@ -1,6 +1,31 @@
-﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+﻿@using Microsoft.AspNetCore.Components.Authorization
+
+<Router AppAssembly="typeof(Program).Assembly"
+        NotFoundPage="typeof(Pages.NotFound)">
+
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+
+        <AuthorizeRouteView RouteData="routeData"
+                            DefaultLayout="typeof(Layout.MainLayout)">
+
+            <NotAuthorized>
+                <div class="container py-5">
+                    <div class="alert alert-warning">
+                        Du bist für diese Seite nicht berechtigt.
+                    </div>
+
+                    <a class="btn btn-primary"
+                       href="/login">
+                        Zur Anmeldung
+                    </a>
+                </div>
+            </NotAuthorized>
+
+        </AuthorizeRouteView>
+
+        <FocusOnNavigate RouteData="routeData"
+                         Selector="h1" />
+
     </Found>
+
 </Router>

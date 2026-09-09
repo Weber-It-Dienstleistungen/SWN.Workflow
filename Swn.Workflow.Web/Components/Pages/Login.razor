@@ -1,0 +1,71 @@
+﻿@page "/login"
+
+<PageTitle>Anmelden</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-5">
+        <div class="mb-4 text-center">
+            <h1 class="display-6 fw-semibold mb-2">
+                SWN Workflow
+            </h1>
+
+            <p class="text-secondary mb-0">
+                Anmeldung am Workflow-System
+            </p>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-body fw-semibold">
+                Anmelden
+            </div>
+
+            <div class="card-body">
+                <form method="post"
+                      action="/account/login">
+
+                    <AntiforgeryToken />
+
+                    <div class="mb-3">
+                        <label class="form-label"
+                               for="userName">
+                            Benutzername
+                        </label>
+
+                        <input id="userName"
+                               name="userName"
+                               class="form-control"
+                               autocomplete="username"
+                               required />
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label"
+                               for="password">
+                            Passwort
+                        </label>
+
+                        <input id="password"
+                               name="password"
+                               type="password"
+                               class="form-control"
+                               autocomplete="current-password"
+                               required />
+                    </div>
+
+                    <button class="btn btn-primary w-100"
+                            type="submit">
+                        Anmelden
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="alert alert-light border mt-3 small">
+            <strong>Demozugang Personal:</strong>
+            hr.demo
+            <br />
+            <strong>Demozugang IT:</strong>
+            it.demo
+        </div>
+    </div>
+</div>
