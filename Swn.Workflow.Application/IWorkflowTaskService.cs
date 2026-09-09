@@ -7,4 +7,9 @@ public interface IWorkflowTaskService
         int status,
         string changedByUserId,
         CancellationToken cancellationToken = default);
+
+    Task UpdateCommentAsync(
+        Guid taskInstanceId,
+        string? comment,
+        CancellationToken cancellationToken = default);
 }

@@ -127,4 +127,59 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
 
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task UpdateCommentAsync(
+        Guid taskInstanceId,
+        string? comment,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedComment =
+            string.IsNullOrWhiteSpace(comment)
+                ? null
+                : comment.Trim();
+
+        if (normalizedComment?.Length > 2000)
+        {
+            throw new ArgumentException(
+                "Task comments must not exceed 2000 characters.",
+                nameof(comment));
+        }
+
+        await using var db =
+            await _dbContextFactory.CreateDbContextAsync(
+                cancellationToken);
+
+        var task = await db.TaskInstances
+            .SingleOrDefaultAsync(
+                task => task.Id == taskInstanceId,
+                cancellationToken);
+
+        if (task is null)
+        {
+            throw new InvalidOperationException(
+                $"Task instance '{taskInstanceId}' was not found.");
+        }
+
+        var workflow = await db.WorkflowInstances
+            .SingleOrDefaultAsync(
+                workflow =>
+                    workflow.Id == task.WorkflowInstanceId,
+                cancellationToken);
+
+        if (workflow is null)
+        {
+            throw new InvalidOperationException(
+                $"Workflow instance '{task.WorkflowInstanceId}' was not found.");
+        }
+
+        if (workflow.Status == WorkflowStatus.Cancelled)
+        {
+            throw new InvalidOperationException(
+                "Tasks of a cancelled workflow cannot be changed.");
+        }
+
+        task.Comment = normalizedComment;
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }
