@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Swn.Workflow.Application;
 using Swn.Workflow.Infrastructure;
@@ -27,6 +28,24 @@ var connectionString = builder.Configuration
 builder.Services.AddDbContextFactory<WorkflowDbContext>(options =>
     options.UseSqlite(connectionString));
 
+builder.Services
+    .AddIdentity<ApplicationUser, IdentityRole>(options =>
+    {
+        options.User.RequireUniqueEmail = false;
+
+        options.Password.RequiredLength = 8;
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = false;
+    })
+    .AddEntityFrameworkStores<WorkflowDbContext>()
+    .AddDefaultTokenProviders();
+
+builder.Services.AddAuthorization();
+
+builder.Services.AddCascadingAuthenticationState();
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -40,6 +59,9 @@ app.UseStatusCodePagesWithReExecute(
     createScopeForStatusCodePages: true);
 
 app.UseHttpsRedirection();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseAntiforgery();
 
@@ -62,6 +84,16 @@ using (var scope = app.Services.CreateScope())
     }
 
     await WorkflowSeedData.InitializeAsync(dbFactory);
+
+    var userManager = scope.ServiceProvider
+        .GetRequiredService<UserManager<ApplicationUser>>();
+
+    var roleManager = scope.ServiceProvider
+        .GetRequiredService<RoleManager<IdentityRole>>();
+
+    await IdentitySeedData.InitializeAsync(
+        userManager,
+        roleManager);
 }
 
 app.Run();

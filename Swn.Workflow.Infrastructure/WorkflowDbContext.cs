@@ -1,11 +1,14 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Swn.Workflow.Domain;
 
 namespace Swn.Workflow.Infrastructure;
 
-public class WorkflowDbContext : DbContext
+public class WorkflowDbContext
+    : IdentityDbContext<ApplicationUser>
 {
-    public WorkflowDbContext(DbContextOptions<WorkflowDbContext> options)
+    public WorkflowDbContext(
+        DbContextOptions<WorkflowDbContext> options)
         : base(options)
     {
     }
@@ -34,6 +37,13 @@ public class WorkflowDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<ApplicationUser>(entity =>
+        {
+            entity.Property(x => x.DisplayName)
+                .IsRequired()
+                .HasMaxLength(200);
+        });
 
         modelBuilder.Entity<WorkflowDefinition>(entity =>
         {
