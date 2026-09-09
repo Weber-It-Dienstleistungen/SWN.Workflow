@@ -20,20 +20,21 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         Guid taskInstanceId,
         int status,
         string changedByUserId,
+        IReadOnlyCollection<string> roleKeys,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(changedByUserId);
+        ArgumentNullException.ThrowIfNull(roleKeys);
 
-        var changedBy = changedByUserId.Trim();
+        var changedBy =
+            NormalizeUserId(changedByUserId);
 
-        if (string.IsNullOrWhiteSpace(changedBy))
-        {
-            throw new ArgumentException(
-                "Changing user must not be empty.",
-                nameof(changedByUserId));
-        }
+        var normalizedRoleKeys =
+            NormalizeRoleKeys(roleKeys);
 
-        if (!Enum.IsDefined(typeof(WorkflowTaskStatus), status))
+        if (!Enum.IsDefined(
+            typeof(WorkflowTaskStatus),
+            status))
         {
             throw new ArgumentOutOfRangeException(
                 nameof(status),
@@ -41,16 +42,20 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                 "The supplied task status is invalid.");
         }
 
-        var newStatus = (WorkflowTaskStatus)status;
+        var newStatus =
+            (WorkflowTaskStatus)status;
 
         await using var db =
             await _dbContextFactory.CreateDbContextAsync(
                 cancellationToken);
 
-        var task = await db.TaskInstances
-            .SingleOrDefaultAsync(
-                task => task.Id == taskInstanceId,
-                cancellationToken);
+        var task =
+            await db.TaskInstances
+                .SingleOrDefaultAsync(
+                    task =>
+                        task.Id ==
+                        taskInstanceId,
+                    cancellationToken);
 
         if (task is null)
         {
@@ -58,11 +63,18 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                 $"Task instance '{taskInstanceId}' was not found.");
         }
 
-        var workflow = await db.WorkflowInstances
-            .SingleOrDefaultAsync(
-                workflow =>
-                    workflow.Id == task.WorkflowInstanceId,
-                cancellationToken);
+        EnsureUserMayEditTask(
+            task,
+            changedBy,
+            normalizedRoleKeys);
+
+        var workflow =
+            await db.WorkflowInstances
+                .SingleOrDefaultAsync(
+                    workflow =>
+                        workflow.Id ==
+                        task.WorkflowInstanceId,
+                    cancellationToken);
 
         if (workflow is null)
         {
@@ -70,36 +82,46 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                 $"Workflow instance '{task.WorkflowInstanceId}' was not found.");
         }
 
-        if (workflow.Status == WorkflowStatus.Cancelled)
-        {
-            throw new InvalidOperationException(
-                "Tasks of a cancelled workflow cannot be changed.");
-        }
+        EnsureWorkflowCanBeChanged(
+            workflow);
 
-        task.Status = newStatus;
+        task.Status =
+            newStatus;
 
-        if (newStatus == WorkflowTaskStatus.Completed)
+        if (newStatus ==
+            WorkflowTaskStatus.Completed)
         {
-            task.CompletedAt ??= DateTime.UtcNow;
-            task.CompletedByUserId ??= changedBy;
+            task.CompletedAt =
+                DateTime.UtcNow;
+
+            task.CompletedByUserId =
+                changedBy;
         }
         else
         {
-            task.CompletedAt = null;
-            task.CompletedByUserId = null;
+            task.CompletedAt =
+                null;
+
+            task.CompletedByUserId =
+                null;
         }
 
-        var workflowTasks = await db.TaskInstances
-            .Where(taskInstance =>
-                taskInstance.WorkflowInstanceId == workflow.Id)
-            .ToListAsync(cancellationToken);
+        var workflowTasks =
+            await db.TaskInstances
+                .Where(taskInstance =>
+                    taskInstance.WorkflowInstanceId ==
+                    workflow.Id)
+                .ToListAsync(
+                    cancellationToken);
 
         var allTasksCompleted =
-            workflowTasks.Count > 0 &&
+            workflowTasks.Count > 0
+            &&
             workflowTasks.All(
                 taskInstance =>
                     taskInstance.Status ==
-                        WorkflowTaskStatus.Completed ||
+                        WorkflowTaskStatus.Completed
+                    ||
                     taskInstance.Status ==
                         WorkflowTaskStatus.NotRequired);
 
@@ -111,28 +133,49 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
 
         if (allTasksCompleted)
         {
-            workflow.Status = WorkflowStatus.Completed;
-            workflow.CompletedAt ??= DateTime.UtcNow;
+            workflow.Status =
+                WorkflowStatus.Completed;
+
+            workflow.CompletedAt ??=
+                DateTime.UtcNow;
         }
         else if (anyTaskStarted)
         {
-            workflow.Status = WorkflowStatus.InProgress;
-            workflow.CompletedAt = null;
+            workflow.Status =
+                WorkflowStatus.InProgress;
+
+            workflow.CompletedAt =
+                null;
         }
         else
         {
-            workflow.Status = WorkflowStatus.Open;
-            workflow.CompletedAt = null;
+            workflow.Status =
+                WorkflowStatus.Open;
+
+            workflow.CompletedAt =
+                null;
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        await db.SaveChangesAsync(
+            cancellationToken);
     }
 
     public async Task UpdateCommentAsync(
         Guid taskInstanceId,
         string? comment,
+        string changedByUserId,
+        IReadOnlyCollection<string> roleKeys,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(changedByUserId);
+        ArgumentNullException.ThrowIfNull(roleKeys);
+
+        var changedBy =
+            NormalizeUserId(changedByUserId);
+
+        var normalizedRoleKeys =
+            NormalizeRoleKeys(roleKeys);
+
         var normalizedComment =
             string.IsNullOrWhiteSpace(comment)
                 ? null
@@ -149,10 +192,13 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
             await _dbContextFactory.CreateDbContextAsync(
                 cancellationToken);
 
-        var task = await db.TaskInstances
-            .SingleOrDefaultAsync(
-                task => task.Id == taskInstanceId,
-                cancellationToken);
+        var task =
+            await db.TaskInstances
+                .SingleOrDefaultAsync(
+                    task =>
+                        task.Id ==
+                        taskInstanceId,
+                    cancellationToken);
 
         if (task is null)
         {
@@ -160,11 +206,18 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                 $"Task instance '{taskInstanceId}' was not found.");
         }
 
-        var workflow = await db.WorkflowInstances
-            .SingleOrDefaultAsync(
-                workflow =>
-                    workflow.Id == task.WorkflowInstanceId,
-                cancellationToken);
+        EnsureUserMayEditTask(
+            task,
+            changedBy,
+            normalizedRoleKeys);
+
+        var workflow =
+            await db.WorkflowInstances
+                .SingleOrDefaultAsync(
+                    workflow =>
+                        workflow.Id ==
+                        task.WorkflowInstanceId,
+                    cancellationToken);
 
         if (workflow is null)
         {
@@ -172,14 +225,92 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                 $"Workflow instance '{task.WorkflowInstanceId}' was not found.");
         }
 
-        if (workflow.Status == WorkflowStatus.Cancelled)
+        EnsureWorkflowCanBeChanged(
+            workflow);
+
+        task.Comment =
+            normalizedComment;
+
+        await db.SaveChangesAsync(
+            cancellationToken);
+    }
+
+    private static string NormalizeUserId(
+        string userId)
+    {
+        var normalizedUserId =
+            userId.Trim();
+
+        if (string.IsNullOrWhiteSpace(
+            normalizedUserId))
+        {
+            throw new ArgumentException(
+                "Changing user must not be empty.",
+                nameof(userId));
+        }
+
+        return normalizedUserId;
+    }
+
+    private static string[] NormalizeRoleKeys(
+        IReadOnlyCollection<string> roleKeys)
+    {
+        return roleKeys
+            .Where(role =>
+                !string.IsNullOrWhiteSpace(role))
+            .Select(role =>
+                role.Trim().ToUpperInvariant())
+            .Distinct()
+            .ToArray();
+    }
+
+    private static void EnsureUserMayEditTask(
+        TaskInstance task,
+        string userId,
+        IReadOnlyCollection<string> roleKeys)
+    {
+        var isDirectlyAssigned =
+            !string.IsNullOrWhiteSpace(
+                task.AssignedUserId)
+            &&
+            string.Equals(
+                task.AssignedUserId,
+                userId,
+                StringComparison.Ordinal);
+
+        var isAssignedByRole =
+            string.IsNullOrWhiteSpace(
+                task.AssignedUserId)
+            &&
+            roleKeys.Contains(
+                task.AssignedRoleKey,
+                StringComparer.OrdinalIgnoreCase);
+
+        if (isDirectlyAssigned ||
+            isAssignedByRole)
+        {
+            return;
+        }
+
+        throw new UnauthorizedAccessException(
+            "The current user is not allowed to edit this task.");
+    }
+
+    private static void EnsureWorkflowCanBeChanged(
+        WorkflowInstance workflow)
+    {
+        if (workflow.Status ==
+            WorkflowStatus.Cancelled)
         {
             throw new InvalidOperationException(
                 "Tasks of a cancelled workflow cannot be changed.");
         }
 
-        task.Comment = normalizedComment;
-
-        await db.SaveChangesAsync(cancellationToken);
+        if (workflow.Status ==
+            WorkflowStatus.Completed)
+        {
+            throw new InvalidOperationException(
+                "Tasks of a completed workflow cannot be changed.");
+        }
     }
 }

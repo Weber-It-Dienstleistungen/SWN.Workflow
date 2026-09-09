@@ -16,27 +16,12 @@ public sealed class WorkflowDetailService : IWorkflowDetailService
         _dbContextFactory = dbContextFactory;
     }
 
-    public Task<WorkflowDetailItem?> GetByIdAsync(
-        Guid workflowInstanceId,
-        CancellationToken cancellationToken = default)
-    {
-        return GetInternalAsync(
-            workflowInstanceId,
-            userId: null,
-            roleKeys: Array.Empty<string>(),
-            includeAllTasks: true,
-            cancellationToken);
-    }
-
-    public Task<WorkflowDetailItem?> GetForUserAsync(
+    public async Task<WorkflowDetailItem?> GetForInitiatorAsync(
         Guid workflowInstanceId,
         string userId,
-        IReadOnlyCollection<string> roleKeys,
-        bool includeAllTasks,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(userId);
-        ArgumentNullException.ThrowIfNull(roleKeys);
 
         var normalizedUserId =
             userId.Trim();
@@ -48,30 +33,6 @@ public sealed class WorkflowDetailService : IWorkflowDetailService
                 nameof(userId));
         }
 
-        var normalizedRoleKeys =
-            roleKeys
-                .Where(role =>
-                    !string.IsNullOrWhiteSpace(role))
-                .Select(role =>
-                    role.Trim().ToUpperInvariant())
-                .Distinct()
-                .ToArray();
-
-        return GetInternalAsync(
-            workflowInstanceId,
-            normalizedUserId,
-            normalizedRoleKeys,
-            includeAllTasks,
-            cancellationToken);
-    }
-
-    private async Task<WorkflowDetailItem?> GetInternalAsync(
-        Guid workflowInstanceId,
-        string? userId,
-        IReadOnlyCollection<string> roleKeys,
-        bool includeAllTasks,
-        CancellationToken cancellationToken)
-    {
         await using var db =
             await _dbContextFactory.CreateDbContextAsync(
                 cancellationToken);
@@ -85,7 +46,10 @@ public sealed class WorkflowDetailService : IWorkflowDetailService
             join definition in db.WorkflowDefinitions.AsNoTracking()
                 on version.WorkflowDefinitionId equals definition.Id
 
-            where instance.Id == workflowInstanceId
+            where
+                instance.Id == workflowInstanceId
+                &&
+                instance.CreatedByUserId == normalizedUserId
 
             select new
             {
@@ -144,54 +108,39 @@ public sealed class WorkflowDetailService : IWorkflowDetailService
                         ),
                     cancellationToken);
 
-        var taskQuery =
-            from taskInstance in db.TaskInstances.AsNoTracking()
-
-            join taskDefinition in db.TaskDefinitions.AsNoTracking()
-                on taskInstance.TaskDefinitionId
-                equals taskDefinition.Id
-
-            where taskInstance.WorkflowInstanceId ==
-                  workflowInstanceId
-
-            select new
-            {
-                taskInstance.Id,
-                taskDefinition.Key,
-                taskDefinition.Title,
-                taskDefinition.Description,
-                taskDefinition.Phase,
-                taskDefinition.SortOrder,
-                taskInstance.AssignedRoleKey,
-                taskDefinition.IsOptional,
-                taskInstance.Status,
-                taskInstance.AssignedUserId,
-                taskInstance.Comment,
-                taskInstance.CompletedByUserId,
-                taskInstance.CompletedAt
-            };
-
-        if (!includeAllTasks)
-        {
-            taskQuery =
-                taskQuery.Where(task =>
-                    task.AssignedUserId == userId
-                    ||
-                    (
-                        task.AssignedUserId == null
-                        &&
-                        roleKeys.Contains(
-                            task.AssignedRoleKey)
-                    ));
-        }
-
         var taskData =
-            await taskQuery
-                .OrderBy(task =>
-                    task.SortOrder)
-                .ThenBy(task =>
-                    task.Key)
-                .ToListAsync(cancellationToken);
+            await (
+                from taskInstance in db.TaskInstances.AsNoTracking()
+
+                join taskDefinition in db.TaskDefinitions.AsNoTracking()
+                    on taskInstance.TaskDefinitionId
+                    equals taskDefinition.Id
+
+                where
+                    taskInstance.WorkflowInstanceId ==
+                    workflowInstanceId
+
+                orderby
+                    taskDefinition.SortOrder,
+                    taskDefinition.Key
+
+                select new
+                {
+                    taskInstance.Id,
+                    taskDefinition.Key,
+                    taskDefinition.Title,
+                    taskDefinition.Description,
+                    taskDefinition.Phase,
+                    taskDefinition.SortOrder,
+                    taskInstance.AssignedRoleKey,
+                    taskDefinition.IsOptional,
+                    taskInstance.Status,
+                    taskInstance.AssignedUserId,
+                    taskInstance.Comment,
+                    taskInstance.CompletedByUserId,
+                    taskInstance.CompletedAt
+                })
+            .ToListAsync(cancellationToken);
 
         var tasks =
             taskData

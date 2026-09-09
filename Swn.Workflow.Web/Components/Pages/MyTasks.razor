@@ -408,7 +408,8 @@
                 .UpdateStatusAsync(
                     taskInstanceId,
                     status,
-                    _currentUserId);
+                    _currentUserId,
+                    _currentRoleKeys);
 
             await ReloadTasksAsync();
 
@@ -428,6 +429,15 @@
     private async Task SaveCommentAsync(
         Guid taskInstanceId)
     {
+        if (string.IsNullOrWhiteSpace(
+            _currentUserId))
+        {
+            _errorMessage =
+                "Der angemeldete Benutzer konnte nicht ermittelt werden.";
+
+            return;
+        }
+
         _savingCommentTaskId =
             taskInstanceId;
 
@@ -443,7 +453,9 @@
             await WorkflowTaskService
                 .UpdateCommentAsync(
                     taskInstanceId,
-                    comment);
+                    comment,
+                    _currentUserId,
+                    _currentRoleKeys);
 
             await ReloadTasksAsync();
 

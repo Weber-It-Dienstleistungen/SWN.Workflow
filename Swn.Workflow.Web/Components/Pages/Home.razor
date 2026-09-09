@@ -1,9 +1,15 @@
 ﻿@page "/"
 
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Swn.Workflow.Application
 
+@attribute [Authorize]
+
 @inject IDashboardService DashboardService
+@inject IMyTaskService MyTaskService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>SWN Workflow</PageTitle>
 
@@ -14,16 +20,23 @@
         </h1>
 
         <p class="text-secondary mb-0">
-            Zentrale Übersicht für laufende und neue Geschäftsprozesse.
+            Übersicht über deine Prozesse und Aufgaben.
         </p>
     </div>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger">
+            @_errorMessage
+        </div>
+    }
 
     <div class="row g-3 mb-4">
         <div class="col-md-4">
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <div class="text-secondary small mb-2">
-                        Aktive Vorgänge
+                        Eigene aktive Vorgänge
                     </div>
 
                     <div class="fs-2 fw-semibold">
@@ -31,7 +44,7 @@
                     </div>
 
                     <div class="text-secondary small">
-                        Aktuell laufende Geschäftsprozesse
+                        Von dir gestartete laufende Geschäftsprozesse
                     </div>
                 </div>
             </div>
@@ -41,15 +54,15 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <div class="text-secondary small mb-2">
-                        Offene Aufgaben
+                        Meine offenen Aufgaben
                     </div>
 
                     <div class="fs-2 fw-semibold">
-                        @OpenTaskCount
+                        @_myOpenTaskCount
                     </div>
 
                     <div class="text-secondary small">
-                        Noch nicht abgeschlossene Aufgaben
+                        Dir direkt oder über deine Rollen zugewiesen
                     </div>
                 </div>
             </div>
@@ -67,7 +80,7 @@
                     </div>
 
                     <div class="text-secondary small">
-                        Aktive und veröffentlichte Workflow-Vorlagen
+                        Von dir startbare Workflow-Vorlagen
                     </div>
                 </div>
             </div>
@@ -78,7 +91,7 @@
         <div class="col-lg-8">
             <div class="card shadow-sm">
                 <div class="card-header bg-body fw-semibold">
-                    Aktive Vorgänge
+                    Meine Vorgänge
                 </div>
 
                 <div class="card-body p-0">
@@ -92,12 +105,12 @@
                     {
                         <div class="text-center py-5">
                             <h2 class="h5 mb-2">
-                                Keine aktiven Vorgänge
+                                Keine eigenen aktiven Vorgänge
                             </h2>
 
                             <p class="text-secondary mb-0">
-                                Sobald ein Workflow gestartet wurde,
-                                erscheint er hier.
+                                Von dir gestartete laufende Workflows
+                                erscheinen hier.
                             </p>
                         </div>
                     }
@@ -109,11 +122,15 @@
                                 var progress = GetProgress(workflow);
 
                                 <div class="list-group-item p-4">
-                                    <div class="d-flex flex-column flex-md-row
-                                        justify-content-between gap-3">
+                                    <div class="d-flex
+                                        flex-column
+                                        flex-md-row
+                                        justify-content-between
+                                        gap-3">
 
                                         <div class="flex-grow-1">
-                                            <div class="d-flex align-items-center
+                                            <div class="d-flex
+                                                align-items-center
                                                 gap-2 mb-1">
 
                                                 <h2 class="h5 mb-0">
@@ -123,7 +140,8 @@
                                                 <span class="badge
                                                     text-bg-light
                                                     border">
-                                                    @GetStatusText(workflow.Status)
+                                                    @GetStatusText(
+                                                        workflow.Status)
                                                 </span>
                                             </div>
 
@@ -134,8 +152,8 @@
                                             <div class="small mb-3">
                                                 Stichtag:
                                                 <strong>
-                                                    @workflow.ReferenceDate
-                                                    .ToString("dd.MM.yyyy")
+                                                    @(workflow.ReferenceDate
+                                                        .ToString("dd.MM.yyyy"))
                                                 </strong>
                                             </div>
 
@@ -169,7 +187,8 @@
 
                                         <div class="d-flex align-items-center">
                                             <a class="btn btn-outline-primary"
-                                               href="@GetDetailUrl(workflow.Id)">
+                                               href="@GetDetailUrl(
+                                                                                                  workflow.Id)">
                                                 Vorgang öffnen
                                             </a>
                                         </div>
@@ -200,24 +219,30 @@
                             else if (_availableWorkflows.Count == 0)
                             {
                                 <div class="text-secondary">
-                                    Keine startbaren Workflow-Vorlagen vorhanden.
+                                    Keine startbaren Workflow-Vorlagen
+                                    vorhanden.
                                 </div>
                             }
                             else
                             {
                                 <div class="d-grid gap-3">
-                                    @foreach (var workflow in _availableWorkflows)
+                                    @foreach (var workflow
+                                        in _availableWorkflows)
                                     {
                                         <div>
-                                            <a class="btn btn-outline-primary w-100"
-                                               href="@GetStartUrl(workflow.Key)">
+                                            <a class="btn
+                                                btn-outline-primary
+                                                w-100"
+                                               href="@GetStartUrl(
+                                                                                                  workflow.Key)">
                                                 @workflow.Name
                                             </a>
 
                                             @if (!string.IsNullOrWhiteSpace(
                                                 workflow.Description))
                                             {
-                                                <div class="text-secondary small mt-1">
+                                                <div class="text-secondary
+                                                    small mt-1">
                                                     @workflow.Description
                                                 </div>
                                             }
@@ -232,14 +257,20 @@
                 <NotAuthorized>
                     <div class="card shadow-sm">
                         <div class="card-header bg-body fw-semibold">
-                            Neue Vorgänge
+                            Arbeitsbereich
                         </div>
 
                         <div class="card-body">
-                            <div class="text-secondary">
-                                Neue Vorgänge werden durch die
-                                Personalabteilung gestartet.
+                            <div class="text-secondary mb-3">
+                                Deine zugewiesenen Arbeitsschritte
+                                findest du in deinem persönlichen
+                                Aufgabenbereich.
                             </div>
+
+                            <a class="btn btn-outline-primary w-100"
+                               href="/tasks">
+                                Meine Aufgaben öffnen
+                            </a>
                         </div>
                     </div>
                 </NotAuthorized>
@@ -255,32 +286,98 @@
     private IReadOnlyList<AvailableWorkflowItem> _availableWorkflows =
         Array.Empty<AvailableWorkflowItem>();
 
+    private int _myOpenTaskCount;
+
     private bool _isLoading = true;
 
-    private int OpenTaskCount =>
-        _activeWorkflows.Sum(
-            workflow =>
-                workflow.TotalTasks - workflow.CompletedTasks);
+    private string? _errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
-        _activeWorkflows =
-            await DashboardService.GetActiveWorkflowsAsync();
+        _isLoading = true;
 
-        _availableWorkflows =
-            await DashboardService.GetAvailableWorkflowsAsync();
+        try
+        {
+            var authenticationState =
+                await AuthenticationStateProvider
+                    .GetAuthenticationStateAsync();
 
-        _isLoading = false;
+            var user =
+                authenticationState.User;
+
+            var userId =
+                user.FindFirst(
+                    ClaimTypes.NameIdentifier)?
+                    .Value;
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                throw new InvalidOperationException(
+                    "Der angemeldete Benutzer konnte nicht ermittelt werden.");
+            }
+
+            var roleKeys =
+                user.Claims
+                    .Where(claim =>
+                        claim.Type ==
+                        ClaimTypes.Role)
+                    .Select(claim =>
+                        claim.Value)
+                    .Where(role =>
+                        !string.IsNullOrWhiteSpace(role))
+                    .Distinct(
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+
+            _activeWorkflows =
+                await DashboardService
+                    .GetActiveWorkflowsForUserAsync(
+                        userId);
+
+            var myTasks =
+                await MyTaskService
+                    .GetOpenTasksAsync(
+                        userId,
+                        roleKeys);
+
+            _myOpenTaskCount =
+                myTasks.Count;
+
+            if (user.IsInRole("HR"))
+            {
+                _availableWorkflows =
+                    await DashboardService
+                        .GetAvailableWorkflowsAsync();
+            }
+            else
+            {
+                _availableWorkflows =
+                    Array.Empty<AvailableWorkflowItem>();
+            }
+        }
+        catch
+        {
+            _errorMessage =
+                "Das Dashboard konnte nicht geladen werden.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
-    private static string GetStartUrl(string workflowKey)
+    private static string GetStartUrl(
+        string workflowKey)
     {
-        return $"/workflow/start/{Uri.EscapeDataString(workflowKey)}";
+        return
+            $"/workflow/start/{Uri.EscapeDataString(workflowKey)}";
     }
 
-    private static string GetDetailUrl(Guid workflowInstanceId)
+    private static string GetDetailUrl(
+        Guid workflowInstanceId)
     {
-        return $"/workflow/{workflowInstanceId}";
+        return
+            $"/workflow/{workflowInstanceId}";
     }
 
     private static int GetProgress(
@@ -296,7 +393,8 @@
             workflow.TotalTasks);
     }
 
-    private static string GetStatusText(int status)
+    private static string GetStatusText(
+        int status)
     {
         return status switch
         {

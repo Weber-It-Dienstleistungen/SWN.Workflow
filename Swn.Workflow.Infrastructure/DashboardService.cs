@@ -17,22 +17,46 @@ public sealed class DashboardService : IDashboardService
     }
 
     public async Task<IReadOnlyList<WorkflowOverviewItem>>
-        GetActiveWorkflowsAsync(
+        GetActiveWorkflowsForUserAsync(
+            string userId,
             CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(userId);
+
+        var normalizedUserId =
+            userId.Trim();
+
+        if (string.IsNullOrWhiteSpace(normalizedUserId))
+        {
+            throw new ArgumentException(
+                "User ID must not be empty.",
+                nameof(userId));
+        }
+
         await using var db =
             await _dbContextFactory.CreateDbContextAsync(
                 cancellationToken);
 
         var items = await (
             from instance in db.WorkflowInstances.AsNoTracking()
+
             join version in db.WorkflowVersions.AsNoTracking()
                 on instance.WorkflowVersionId equals version.Id
+
             join definition in db.WorkflowDefinitions.AsNoTracking()
                 on version.WorkflowDefinitionId equals definition.Id
-            where instance.Status == WorkflowStatus.Open
-                  || instance.Status == WorkflowStatus.InProgress
+
+            where
+                instance.CreatedByUserId == normalizedUserId
+                &&
+                (
+                    instance.Status == WorkflowStatus.Open
+                    ||
+                    instance.Status == WorkflowStatus.InProgress
+                )
+
             orderby instance.CreatedAt descending
+
             select new
             {
                 instance.Id,
@@ -43,25 +67,34 @@ public sealed class DashboardService : IDashboardService
 
                 TotalTasks = db.TaskInstances.Count(
                     task =>
-                        task.WorkflowInstanceId == instance.Id),
+                        task.WorkflowInstanceId ==
+                        instance.Id),
 
                 CompletedTasks = db.TaskInstances.Count(
                     task =>
-                        task.WorkflowInstanceId == instance.Id &&
-                        (task.Status == WorkflowTaskStatus.Completed
-                         || task.Status == WorkflowTaskStatus.NotRequired))
+                        task.WorkflowInstanceId ==
+                            instance.Id
+                        &&
+                        (
+                            task.Status ==
+                                WorkflowTaskStatus.Completed
+                            ||
+                            task.Status ==
+                                WorkflowTaskStatus.NotRequired
+                        ))
             })
             .ToListAsync(cancellationToken);
 
         return items
-            .Select(item => new WorkflowOverviewItem(
-                item.Id,
-                item.WorkflowName,
-                item.Subject,
-                item.ReferenceDate,
-                (int)item.Status,
-                item.TotalTasks,
-                item.CompletedTasks))
+            .Select(item =>
+                new WorkflowOverviewItem(
+                    item.Id,
+                    item.WorkflowName,
+                    item.Subject,
+                    item.ReferenceDate,
+                    (int)item.Status,
+                    item.TotalTasks,
+                    item.CompletedTasks))
             .ToList();
     }
 
@@ -76,16 +109,21 @@ public sealed class DashboardService : IDashboardService
         return await db.WorkflowDefinitions
             .AsNoTracking()
             .Where(definition =>
-                definition.IsActive &&
+                definition.IsActive
+                &&
                 db.WorkflowVersions.Any(
                     version =>
-                        version.WorkflowDefinitionId == definition.Id &&
+                        version.WorkflowDefinitionId ==
+                            definition.Id
+                        &&
                         version.IsPublished))
-            .OrderBy(definition => definition.Name)
-            .Select(definition => new AvailableWorkflowItem(
-                definition.Key,
-                definition.Name,
-                definition.Description))
+            .OrderBy(definition =>
+                definition.Name)
+            .Select(definition =>
+                new AvailableWorkflowItem(
+                    definition.Key,
+                    definition.Name,
+                    definition.Description))
             .ToListAsync(cancellationToken);
     }
 }
