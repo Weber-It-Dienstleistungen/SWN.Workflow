@@ -22,6 +22,9 @@ public class WorkflowDbContext
     public DbSet<TaskDefinition> TaskDefinitions =>
         Set<TaskDefinition>();
 
+    public DbSet<TaskFieldDefinition> TaskFieldDefinitions =>
+        Set<TaskFieldDefinition>();
+
     public DbSet<WorkflowInstance> WorkflowInstances =>
         Set<WorkflowInstance>();
 
@@ -30,6 +33,9 @@ public class WorkflowDbContext
 
     public DbSet<TaskInstance> TaskInstances =>
         Set<TaskInstance>();
+
+    public DbSet<TaskInstanceFieldValue> TaskInstanceFieldValues =>
+        Set<TaskInstanceFieldValue>();
 
     public DbSet<TaskInstanceSecret> TaskInstanceSecrets =>
         Set<TaskInstanceSecret>();
@@ -119,6 +125,31 @@ public class WorkflowDbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<TaskFieldDefinition>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Key)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Label)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            entity.HasIndex(x => new
+            {
+                x.TaskDefinitionId,
+                x.Key
+            })
+            .IsUnique();
+
+            entity.HasOne<TaskDefinition>()
+                .WithMany()
+                .HasForeignKey(x => x.TaskDefinitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<WorkflowInstance>(entity =>
         {
             entity.HasKey(x => x.Id);
@@ -190,6 +221,31 @@ public class WorkflowDbContext
                 .WithMany()
                 .HasForeignKey(x => x.TaskDefinitionId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TaskInstanceFieldValue>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Key)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Value)
+                .IsRequired()
+                .HasMaxLength(2000);
+
+            entity.HasIndex(x => new
+            {
+                x.TaskInstanceId,
+                x.Key
+            })
+            .IsUnique();
+
+            entity.HasOne<TaskInstance>()
+                .WithMany()
+                .HasForeignKey(x => x.TaskInstanceId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<TaskInstanceSecret>(entity =>

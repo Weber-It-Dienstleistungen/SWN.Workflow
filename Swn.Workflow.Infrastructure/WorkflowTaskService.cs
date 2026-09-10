@@ -7,13 +7,17 @@ namespace Swn.Workflow.Infrastructure;
 public sealed class WorkflowTaskService : IWorkflowTaskService
 {
     private readonly IDbContextFactory<WorkflowDbContext> _dbContextFactory;
+    private readonly ISecretProtector _secretProtector;
 
     public WorkflowTaskService(
-        IDbContextFactory<WorkflowDbContext> dbContextFactory)
+        IDbContextFactory<WorkflowDbContext> dbContextFactory,
+        ISecretProtector secretProtector)
     {
         ArgumentNullException.ThrowIfNull(dbContextFactory);
+        ArgumentNullException.ThrowIfNull(secretProtector);
 
         _dbContextFactory = dbContextFactory;
+        _secretProtector = secretProtector;
     }
 
     public async Task UpdateStatusAsync(
@@ -230,6 +234,244 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
 
         task.Comment =
             normalizedComment;
+
+        await db.SaveChangesAsync(
+            cancellationToken);
+    }
+
+    public async Task UpdateFieldValueAsync(
+        Guid taskInstanceId,
+        string fieldKey,
+        string? value,
+        string changedByUserId,
+        IReadOnlyCollection<string> roleKeys,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(fieldKey);
+        ArgumentNullException.ThrowIfNull(changedByUserId);
+        ArgumentNullException.ThrowIfNull(roleKeys);
+
+        var normalizedFieldKey =
+            fieldKey.Trim();
+
+        if (string.IsNullOrWhiteSpace(
+            normalizedFieldKey))
+        {
+            throw new ArgumentException(
+                "Field key must not be empty.",
+                nameof(fieldKey));
+        }
+
+        if (normalizedFieldKey.Length > 100)
+        {
+            throw new ArgumentException(
+                "Field key must not exceed 100 characters.",
+                nameof(fieldKey));
+        }
+
+        var changedBy =
+            NormalizeUserId(changedByUserId);
+
+        var normalizedRoleKeys =
+            NormalizeRoleKeys(roleKeys);
+
+        await using var db =
+            await _dbContextFactory.CreateDbContextAsync(
+                cancellationToken);
+
+        var task =
+            await db.TaskInstances
+                .SingleOrDefaultAsync(
+                    task =>
+                        task.Id ==
+                        taskInstanceId,
+                    cancellationToken);
+
+        if (task is null)
+        {
+            throw new InvalidOperationException(
+                $"Task instance '{taskInstanceId}' was not found.");
+        }
+
+        EnsureUserMayEditTask(
+            task,
+            changedBy,
+            normalizedRoleKeys);
+
+        var workflow =
+            await db.WorkflowInstances
+                .SingleOrDefaultAsync(
+                    workflow =>
+                        workflow.Id ==
+                        task.WorkflowInstanceId,
+                    cancellationToken);
+
+        if (workflow is null)
+        {
+            throw new InvalidOperationException(
+                $"Workflow instance '{task.WorkflowInstanceId}' was not found.");
+        }
+
+        EnsureWorkflowCanBeChanged(
+            workflow);
+
+        var fieldDefinition =
+            await db.TaskFieldDefinitions
+                .SingleOrDefaultAsync(
+                    field =>
+                        field.TaskDefinitionId ==
+                            task.TaskDefinitionId
+                        &&
+                        field.Key ==
+                            normalizedFieldKey,
+                    cancellationToken);
+
+        if (fieldDefinition is null)
+        {
+            throw new InvalidOperationException(
+                $"Task field '{normalizedFieldKey}' was not found.");
+        }
+
+        switch (fieldDefinition.FieldType)
+        {
+            case TaskFieldType.Text:
+                {
+                    if (value?.Length > 2000)
+                    {
+                        throw new ArgumentException(
+                            "Text field values must not exceed 2000 characters.",
+                            nameof(value));
+                    }
+
+                    var existingValue =
+                        await db.TaskInstanceFieldValues
+                            .SingleOrDefaultAsync(
+                                storedValue =>
+                                    storedValue.TaskInstanceId ==
+                                        taskInstanceId
+                                    &&
+                                    storedValue.Key ==
+                                        fieldDefinition.Key,
+                                cancellationToken);
+
+                    var existingSecret =
+                        await db.TaskInstanceSecrets
+                            .SingleOrDefaultAsync(
+                                secret =>
+                                    secret.TaskInstanceId ==
+                                        taskInstanceId
+                                    &&
+                                    secret.Key ==
+                                        fieldDefinition.Key,
+                                cancellationToken);
+
+                    if (existingSecret is not null)
+                    {
+                        db.TaskInstanceSecrets.Remove(
+                            existingSecret);
+                    }
+
+                    if (string.IsNullOrEmpty(value))
+                    {
+                        if (existingValue is not null)
+                        {
+                            db.TaskInstanceFieldValues.Remove(
+                                existingValue);
+                        }
+                    }
+                    else if (existingValue is null)
+                    {
+                        db.TaskInstanceFieldValues.Add(
+                            new TaskInstanceFieldValue
+                            {
+                                Id = Guid.NewGuid(),
+                                TaskInstanceId = taskInstanceId,
+                                Key = fieldDefinition.Key,
+                                Value = value
+                            });
+                    }
+                    else
+                    {
+                        existingValue.Value =
+                            value;
+                    }
+
+                    break;
+                }
+
+            case TaskFieldType.Secret:
+                {
+                    var existingSecret =
+                        await db.TaskInstanceSecrets
+                            .SingleOrDefaultAsync(
+                                secret =>
+                                    secret.TaskInstanceId ==
+                                        taskInstanceId
+                                    &&
+                                    secret.Key ==
+                                        fieldDefinition.Key,
+                                cancellationToken);
+
+                    var existingValue =
+                        await db.TaskInstanceFieldValues
+                            .SingleOrDefaultAsync(
+                                storedValue =>
+                                    storedValue.TaskInstanceId ==
+                                        taskInstanceId
+                                    &&
+                                    storedValue.Key ==
+                                        fieldDefinition.Key,
+                                cancellationToken);
+
+                    if (existingValue is not null)
+                    {
+                        db.TaskInstanceFieldValues.Remove(
+                            existingValue);
+                    }
+
+                    if (string.IsNullOrEmpty(value))
+                    {
+                        if (existingSecret is not null)
+                        {
+                            db.TaskInstanceSecrets.Remove(
+                                existingSecret);
+                        }
+                    }
+                    else
+                    {
+                        var encryptedValue =
+                            _secretProtector.Protect(
+                                value);
+
+                        if (existingSecret is null)
+                        {
+                            db.TaskInstanceSecrets.Add(
+                                new TaskInstanceSecret
+                                {
+                                    Id = Guid.NewGuid(),
+                                    TaskInstanceId = taskInstanceId,
+                                    Key = fieldDefinition.Key,
+                                    Label = fieldDefinition.Label,
+                                    EncryptedValue = encryptedValue
+                                });
+                        }
+                        else
+                        {
+                            existingSecret.Label =
+                                fieldDefinition.Label;
+
+                            existingSecret.EncryptedValue =
+                                encryptedValue;
+                        }
+                    }
+
+                    break;
+                }
+
+            default:
+                throw new InvalidOperationException(
+                    $"Task field type '{fieldDefinition.FieldType}' is not supported.");
+        }
 
         await db.SaveChangesAsync(
             cancellationToken);

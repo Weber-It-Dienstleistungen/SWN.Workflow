@@ -141,6 +141,8 @@ using (var scope = app.Services.CreateScope())
 
     await WorkflowSeedData.InitializeAsync(dbFactory);
 
+    await TaskFieldSeedData.InitializeAsync(dbFactory);
+
     var userManager = scope.ServiceProvider
         .GetRequiredService<UserManager<ApplicationUser>>();
 

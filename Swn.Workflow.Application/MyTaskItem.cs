@@ -13,4 +13,5 @@ public sealed record MyTaskItem(
     int SortOrder,
     string AssignedRoleKey,
     int Status,
-    string? Comment);
+    string? Comment,
+    IReadOnlyList<MyTaskFieldItem> Fields);

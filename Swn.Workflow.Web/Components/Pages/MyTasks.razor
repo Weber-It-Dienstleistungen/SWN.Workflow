@@ -142,12 +142,138 @@
                                         </span>
 
                                         <div class="fw-semibold">
-                                            @(task.ReferenceDate
-                                                .ToString("dd.MM.yyyy"))
+                                            @task.ReferenceDate
+                                            .ToString("dd.MM.yyyy")
                                         </div>
                                     </div>
 
                                 </div>
+
+                                @if (task.Fields.Count > 0)
+                                {
+                                    <div class="border rounded p-3 mb-4">
+
+                                        <div class="fw-semibold mb-3">
+                                            Aufgabendaten
+                                        </div>
+
+                                        <div class="row g-3">
+
+                                            @foreach (var field in
+                                                task.Fields
+                                                    .OrderBy(
+                                                        field =>
+                                                            field.SortOrder))
+                                            {
+                                                <div class="col-lg-6">
+
+                                                    <label class="form-label"
+                                                           for="@GetFieldInputId(
+                                                                                                                       task.Id,
+                                                                                                                       field.SortOrder)">
+
+                                                        @field.Label
+
+                                                        @if (field.IsRequired)
+                                                        {
+                                                            <span class="text-danger">
+                                                                *
+                                                            </span>
+                                                        }
+
+                                                    </label>
+
+                                                    <div class="input-group">
+
+                                                        <input id="@GetFieldInputId(
+                                                                                                                           task.Id,
+                                                                                                                           field.SortOrder)"
+                                                               type="@GetFieldInputType(
+                                                                                                                           field.FieldType)"
+                                                               class="form-control"
+                                                               maxlength="2000"
+                                                               autocomplete="off"
+                                                               value="@GetFieldDraft(
+                                                                                                                           task.Id,
+                                                                                                                           field.Key)"
+                                                               disabled="@IsSavingField(
+                                                                                                                           task.Id,
+                                                                                                                           field.Key)"
+                                                               @oninput="args =>
+                                                                                                                           SetFieldDraft(
+                                                                                                                               task.Id,
+                                                                                                                               field.Key,
+                                                                                                                               args.Value?
+                                                                                                                                   .ToString())" />
+
+<button type="button"
+                                                                class="btn
+                                                            btn-outline-secondary"
+                                                                disabled="@IsSavingField(
+                                                                                                                                task.Id,
+                                                                                                                                field.Key)"
+                                                                @onclick="() =>
+                                                                                                                                SaveFieldAsync(
+                                                                                                                                    task.Id,
+                                                                                                                                    field.Key)">
+
+                                                            @if (IsSavingField(
+                                                                task.Id,
+                                                                field.Key))
+                                                            {
+                                                                <span>
+                                                                    Speichern...
+                                                                </span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span>
+                                                                    Speichern
+                                                                </span>
+                                                            }
+
+                                                        </button>
+
+                                                    </div>
+
+                                                    @if (field.FieldType == 1)
+                                                    {
+                                                        <div class="form-text">
+                                                            Der Wert wird
+                                                            verschlüsselt gespeichert.
+                                                        </div>
+                                                    }
+                                                    else if (IsSavedField(
+                                                        task.Id,
+                                                        field.Key))
+                                                    {
+                                                        <div class="form-text text-success">
+                                                            Wert gespeichert.
+                                                        </div>
+                                                    }
+
+                                                    @if (field.FieldType == 1
+                                                        &&
+                                                        IsSavedField(
+                                                            task.Id,
+                                                            field.Key))
+                                                    {
+                                                        <div class="form-text text-success">
+                                                            Wert verschlüsselt gespeichert.
+                                                        </div>
+                                                    }
+
+                                                </div>
+                                            }
+
+                                        </div>
+
+                                        <div class="form-text mt-3">
+                                            * Pflichtfeld
+                                        </div>
+
+                                    </div>
+                                }
 
                                 <div>
                                     <label class="form-label"
@@ -223,6 +349,7 @@
                                         }
 
                                     </button>
+
                                 </div>
                             </div>
                         </div>
@@ -282,6 +409,7 @@
 
     </div>
 }
+
 </div>
 
 @code {
@@ -290,6 +418,10 @@
 
     private readonly Dictionary<Guid, string> _commentDrafts =
         new();
+
+    private readonly Dictionary<(Guid TaskId, string FieldKey), string>
+        _fieldDrafts =
+            new();
 
     private IReadOnlyCollection<string> _currentRoleKeys =
         Array.Empty<string>();
@@ -303,6 +435,10 @@
     private Guid? _savingCommentTaskId;
 
     private Guid? _savedCommentTaskId;
+
+    private (Guid TaskId, string FieldKey)? _savingField;
+
+    private (Guid TaskId, string FieldKey)? _savedField;
 
     private string? _errorMessage;
 
@@ -348,6 +484,7 @@
             await ReloadTasksAsync();
 
             ResetCommentDrafts();
+            ResetFieldDrafts();
         }
         catch
         {
@@ -401,6 +538,7 @@
 
         _errorMessage = null;
         _savedCommentTaskId = null;
+        _savedField = null;
 
         try
         {
@@ -414,6 +552,7 @@
             await ReloadTasksAsync();
 
             EnsureCommentDrafts();
+            EnsureFieldDrafts();
         }
         catch
         {
@@ -442,6 +581,7 @@
             taskInstanceId;
 
         _savedCommentTaskId = null;
+        _savedField = null;
         _errorMessage = null;
 
         try
@@ -469,6 +609,8 @@
                 savedTask?.Comment ??
                 string.Empty;
 
+            EnsureFieldDrafts();
+
             _savedCommentTaskId =
                 taskInstanceId;
         }
@@ -480,6 +622,85 @@
         finally
         {
             _savingCommentTaskId = null;
+        }
+    }
+
+    private async Task SaveFieldAsync(
+        Guid taskInstanceId,
+        string fieldKey)
+    {
+        if (string.IsNullOrWhiteSpace(
+            _currentUserId))
+        {
+            _errorMessage =
+                "Der angemeldete Benutzer konnte nicht ermittelt werden.";
+
+            return;
+        }
+
+        var fieldIdentity =
+            (
+                TaskId: taskInstanceId,
+                FieldKey: fieldKey
+            );
+
+        _savingField =
+            fieldIdentity;
+
+        _savedField = null;
+        _savedCommentTaskId = null;
+        _errorMessage = null;
+
+        try
+        {
+            _fieldDrafts.TryGetValue(
+                fieldIdentity,
+                out var value);
+
+            await WorkflowTaskService
+                .UpdateFieldValueAsync(
+                    taskInstanceId,
+                    fieldKey,
+                    value,
+                    _currentUserId,
+                    _currentRoleKeys);
+
+            await ReloadTasksAsync();
+
+            var savedTask =
+                _tasks.FirstOrDefault(
+                    task =>
+                        task.Id ==
+                        taskInstanceId);
+
+            var savedField =
+                savedTask?
+                    .Fields
+                    .FirstOrDefault(
+                        field =>
+                            string.Equals(
+                                field.Key,
+                                fieldKey,
+                                StringComparison.OrdinalIgnoreCase));
+
+            _fieldDrafts[fieldIdentity] =
+                savedField?.Value ??
+                string.Empty;
+
+            EnsureCommentDrafts();
+            EnsureFieldDrafts();
+
+            _savedField =
+                fieldIdentity;
+        }
+        catch
+        {
+            _errorMessage =
+                "Der Feldwert konnte nicht gespeichert werden.";
+        }
+        finally
+        {
+            _savingField = null;
         }
     }
 
@@ -509,6 +730,48 @@
         }
     }
 
+    private void ResetFieldDrafts()
+    {
+        _fieldDrafts.Clear();
+
+        foreach (var task in _tasks)
+        {
+            foreach (var field in task.Fields)
+            {
+                _fieldDrafts[
+                    (
+                        task.Id,
+                        field.Key
+                    )] =
+                    field.Value ??
+                    string.Empty;
+            }
+        }
+    }
+
+    private void EnsureFieldDrafts()
+    {
+        foreach (var task in _tasks)
+        {
+            foreach (var field in task.Fields)
+            {
+                var fieldIdentity =
+                    (
+                        task.Id,
+                        field.Key
+                    );
+
+                if (!_fieldDrafts
+                    .ContainsKey(fieldIdentity))
+                {
+                    _fieldDrafts[fieldIdentity] =
+                        field.Value ??
+                        string.Empty;
+                }
+            }
+        }
+    }
+
     private void SetCommentDraft(
         Guid taskInstanceId,
         string? value)
@@ -524,6 +787,28 @@
         }
     }
 
+    private void SetFieldDraft(
+        Guid taskInstanceId,
+        string fieldKey,
+        string? value)
+    {
+        var fieldIdentity =
+            (
+                taskInstanceId,
+                fieldKey
+            );
+
+        _fieldDrafts[fieldIdentity] =
+            value ??
+            string.Empty;
+
+        if (_savedField ==
+            fieldIdentity)
+        {
+            _savedField = null;
+        }
+    }
+
     private string GetCommentDraft(
         Guid taskInstanceId)
     {
@@ -535,12 +820,65 @@
             : string.Empty;
     }
 
+    private string GetFieldDraft(
+        Guid taskInstanceId,
+        string fieldKey)
+    {
+        return _fieldDrafts
+            .TryGetValue(
+                (
+                    taskInstanceId,
+                    fieldKey
+                ),
+                out var value)
+            ? value
+            : string.Empty;
+    }
+
     private int GetCommentLength(
         Guid taskInstanceId)
     {
         return GetCommentDraft(
             taskInstanceId)
             .Length;
+    }
+
+    private bool IsSavingField(
+        Guid taskInstanceId,
+        string fieldKey)
+    {
+        return _savingField ==
+            (
+                taskInstanceId,
+                fieldKey
+            );
+    }
+
+    private bool IsSavedField(
+        Guid taskInstanceId,
+        string fieldKey)
+    {
+        return _savedField ==
+            (
+                taskInstanceId,
+                fieldKey
+            );
+    }
+
+    private static string GetFieldInputId(
+        Guid taskInstanceId,
+        int sortOrder)
+    {
+        return
+            $"field-{taskInstanceId}-{sortOrder}";
+    }
+
+    private static string GetFieldInputType(
+        int fieldType)
+    {
+        return fieldType == 1
+            ? "password"
+            : "text";
     }
 
     private static string GetTaskCountText(

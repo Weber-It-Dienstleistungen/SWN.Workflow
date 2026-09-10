@@ -15,4 +15,12 @@ public interface IWorkflowTaskService
         string changedByUserId,
         IReadOnlyCollection<string> roleKeys,
         CancellationToken cancellationToken = default);
+
+    Task UpdateFieldValueAsync(
+        Guid taskInstanceId,
+        string fieldKey,
+        string? value,
+        string changedByUserId,
+        IReadOnlyCollection<string> roleKeys,
+        CancellationToken cancellationToken = default);
 }

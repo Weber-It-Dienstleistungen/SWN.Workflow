@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Swn.Workflow.Infrastructure;
 
@@ -10,9 +11,11 @@ using Swn.Workflow.Infrastructure;
 namespace Swn.Workflow.Infrastructure.Migrations
 {
     [DbContext(typeof(WorkflowDbContext))]
-    partial class WorkflowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260909132548_AddTaskFieldDefinitions")]
+    partial class AddTaskFieldDefinitions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
@@ -273,33 +276,6 @@ namespace Swn.Workflow.Infrastructure.Migrations
                     b.HasIndex("WorkflowInstanceId");
 
                     b.ToTable("TaskInstances");
-                });
-
-            modelBuilder.Entity("Swn.Workflow.Domain.TaskInstanceFieldValue", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("TaskInstanceId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Value")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TaskInstanceId", "Key")
-                        .IsUnique();
-
-                    b.ToTable("TaskInstanceFieldValues");
                 });
 
             modelBuilder.Entity("Swn.Workflow.Domain.TaskInstanceSecret", b =>
@@ -602,15 +578,6 @@ namespace Swn.Workflow.Infrastructure.Migrations
                     b.HasOne("Swn.Workflow.Domain.WorkflowInstance", null)
                         .WithMany()
                         .HasForeignKey("WorkflowInstanceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Swn.Workflow.Domain.TaskInstanceFieldValue", b =>
-                {
-                    b.HasOne("Swn.Workflow.Domain.TaskInstance", null)
-                        .WithMany()
-                        .HasForeignKey("TaskInstanceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
