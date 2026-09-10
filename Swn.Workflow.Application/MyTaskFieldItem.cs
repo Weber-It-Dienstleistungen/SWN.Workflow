@@ -6,4 +6,5 @@ public sealed record MyTaskFieldItem(
     int FieldType,
     int SortOrder,
     bool IsRequired,
+    bool HasStoredValue,
     string? Value);

@@ -94,8 +94,10 @@
                                     <span class="badge
                                         @GetStatusBadgeClass(
                                             task.Status)">
-                                        @GetStatusText(task.Status)
+                                        @GetStatusText(
+                                            task.Status)
                                     </span>
+
                                 </div>
 
                                 <h2 class="h5 mb-1">
@@ -143,7 +145,8 @@
 
                                         <div class="fw-semibold">
                                             @task.ReferenceDate
-                                            .ToString("dd.MM.yyyy")
+                                            .ToString(
+                                            "dd.MM.yyyy")
                                         </div>
                                     </div>
 
@@ -193,6 +196,8 @@
                                                                class="form-control"
                                                                maxlength="2000"
                                                                autocomplete="off"
+                                                               placeholder="@GetFieldPlaceholder(
+                                                                                                                           field)"
                                                                value="@GetFieldDraft(
                                                                                                                            task.Id,
                                                                                                                            field.Key)"
@@ -206,12 +211,55 @@
                                                                                                                                args.Value?
                                                                                                                                    .ToString())" />
 
-<button type="button"
+                                                        @if (field.FieldType == 1
+                                                            &&
+                                                            field.HasStoredValue
+                                                            &&
+                                                            CanRevealSecrets())
+                                                        {
+                                                            <button type="button"
+                                                                    class="btn
+                                                                btn-outline-secondary"
+                                                                    disabled="@IsRevealingSecret(
+                                                                                                                                        task.Id,
+                                                                                                                                        field.Key)"
+                                                                    @onclick="() =>
+                                                                                                                                        ToggleSecretAsync(
+                                                                                                                                            task.Id,
+                                                                                                                                            field.Key)">
+
+                                                                @if (IsRevealingSecret(
+                                                                    task.Id,
+                                                                    field.Key))
+                                                                {
+                                                                    <span>
+                                                                        Laden...
+                                                                    </span>
+                                                                }
+                                                                else if (IsSecretRevealed(
+                                                                    task.Id,
+                                                                    field.Key))
+                                                                {
+                                                                    <span>
+                                                                        Ausblenden
+                                                                    </span>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span>
+                                                                        Anzeigen
+                                                                    </span>
+                                                                }
+
+                                                            </button>
+                                                        }
+
+                                                        <button type="button"
                                                                 class="btn
                                                             btn-outline-secondary"
-                                                                disabled="@IsSavingField(
+                                                                disabled="@(!CanSaveField(
                                                                                                                                 task.Id,
-                                                                                                                                field.Key)"
+                                                                                                                                field))"
                                                                 @onclick="() =>
                                                                                                                                 SaveFieldAsync(
                                                                                                                                     task.Id,
@@ -238,16 +286,56 @@
 
                                                     @if (field.FieldType == 1)
                                                     {
-                                                        <div class="form-text">
-                                                            Der Wert wird
-                                                            verschlüsselt gespeichert.
-                                                        </div>
+                                                        @if (field.HasStoredValue)
+                                                        {
+                                                            <div class="form-text">
+                                                                Ein geschützter Wert
+                                                                ist gespeichert.
+                                                                Ein neuer Wert ersetzt
+                                                                den vorhandenen Wert.
+                                                            </div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="form-text">
+                                                                Der Wert wird
+                                                                verschlüsselt gespeichert.
+                                                            </div>
+                                                        }
+
+                                                        @if (IsSecretRevealed(
+                                                            task.Id,
+                                                            field.Key))
+                                                        {
+                                                            <div class="alert
+                                                                alert-warning
+                                                                py-2
+                                                                px-3
+                                                                mt-2
+                                                                mb-0">
+
+                                                                <div class="small
+                                                                    text-secondary">
+                                                                    Geschützter Wert
+                                                                </div>
+
+                                                                <div class="fw-semibold">
+                                                                    <code>
+                                                                        @GetRevealedSecret(
+                                                                            task.Id,
+                                                                            field.Key)
+                                                                    </code>
+                                                                </div>
+
+                                                            </div>
+                                                        }
                                                     }
                                                     else if (IsSavedField(
                                                         task.Id,
                                                         field.Key))
                                                     {
-                                                        <div class="form-text text-success">
+                                                        <div class="form-text
+                                                            text-success">
                                                             Wert gespeichert.
                                                         </div>
                                                     }
@@ -258,8 +346,10 @@
                                                             task.Id,
                                                             field.Key))
                                                     {
-                                                        <div class="form-text text-success">
-                                                            Wert verschlüsselt gespeichert.
+                                                        <div class="form-text
+                                                            text-success">
+                                                            Wert verschlüsselt
+                                                            gespeichert.
                                                         </div>
                                                     }
 
@@ -352,6 +442,7 @@
 
                                 </div>
                             </div>
+
                         </div>
 
                         <div style="min-width: 210px;">
@@ -400,9 +491,11 @@
                                 Erledigte oder nicht erforderliche
                                 Aufgaben verschwinden aus dieser Liste.
                             </div>
+
                         </div>
 
                     </div>
+
                 </div>
             </div>
         }
@@ -416,11 +509,18 @@
     private IReadOnlyList<MyTaskItem> _tasks =
         Array.Empty<MyTaskItem>();
 
-    private readonly Dictionary<Guid, string> _commentDrafts =
-        new();
+    private readonly Dictionary<Guid, string>
+        _commentDrafts =
+            new();
 
-    private readonly Dictionary<(Guid TaskId, string FieldKey), string>
-        _fieldDrafts =
+    private readonly Dictionary<
+        (Guid TaskId, string FieldKey),
+        string> _fieldDrafts =
+            new();
+
+    private readonly Dictionary<
+        (Guid TaskId, string FieldKey),
+        string> _revealedSecrets =
             new();
 
     private IReadOnlyCollection<string> _currentRoleKeys =
@@ -436,9 +536,14 @@
 
     private Guid? _savedCommentTaskId;
 
-    private (Guid TaskId, string FieldKey)? _savingField;
+    private (Guid TaskId, string FieldKey)?
+        _savingField;
 
-    private (Guid TaskId, string FieldKey)? _savedField;
+    private (Guid TaskId, string FieldKey)?
+        _savedField;
+
+    private (Guid TaskId, string FieldKey)?
+        _revealingSecret;
 
     private string? _errorMessage;
 
@@ -511,6 +616,8 @@
                 .GetOpenTasksAsync(
                     _currentUserId,
                     _currentRoleKeys);
+
+        RemoveRevealedSecretsForMissingTasks();
     }
 
     private async Task UpdateTaskStatusAsync(
@@ -670,6 +777,9 @@
                     _currentUserId,
                     _currentRoleKeys);
 
+            _revealedSecrets.Remove(
+                fieldIdentity);
+
             await ReloadTasksAsync();
 
             var savedTask =
@@ -709,6 +819,76 @@
         }
     }
 
+    private async Task ToggleSecretAsync(
+        Guid taskInstanceId,
+        string fieldKey)
+    {
+        var fieldIdentity =
+            (
+                TaskId: taskInstanceId,
+                FieldKey: fieldKey
+            );
+
+        if (_revealedSecrets.ContainsKey(
+            fieldIdentity))
+        {
+            _revealedSecrets.Remove(
+                fieldIdentity);
+
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(
+            _currentUserId))
+        {
+            _errorMessage =
+                "Der angemeldete Benutzer konnte nicht ermittelt werden.";
+
+            return;
+        }
+
+        _revealingSecret =
+            fieldIdentity;
+
+        _errorMessage = null;
+
+        try
+        {
+            var value =
+                await WorkflowTaskService
+                    .GetSecretFieldValueAsync(
+                        taskInstanceId,
+                        fieldKey,
+                        _currentUserId,
+                        _currentRoleKeys);
+
+            if (value is null)
+            {
+                _errorMessage =
+                    "Für dieses Feld ist kein geschützter Wert gespeichert.";
+
+                return;
+            }
+
+            _revealedSecrets[fieldIdentity] =
+                value;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _errorMessage =
+                "Du bist nicht berechtigt, diesen geschützten Wert anzuzeigen.";
+        }
+        catch
+        {
+            _errorMessage =
+                "Der geschützte Wert konnte nicht angezeigt werden.";
+        }
+        finally
+        {
+            _revealingSecret = null;
+        }
+    }
+
     private void ResetCommentDrafts()
     {
         _commentDrafts.Clear();
@@ -726,7 +906,8 @@
         foreach (var task in _tasks)
         {
             if (!_commentDrafts
-                .ContainsKey(task.Id))
+                .ContainsKey(
+                    task.Id))
             {
                 _commentDrafts[task.Id] =
                     task.Comment ??
@@ -767,13 +948,36 @@
                     );
 
                 if (!_fieldDrafts
-                    .ContainsKey(fieldIdentity))
+                    .ContainsKey(
+                        fieldIdentity))
                 {
                     _fieldDrafts[fieldIdentity] =
                         field.Value ??
                         string.Empty;
                 }
             }
+        }
+    }
+
+    private void RemoveRevealedSecretsForMissingTasks()
+    {
+        var existingTaskIds =
+            _tasks
+                .Select(task =>
+                    task.Id)
+                .ToHashSet();
+
+        var keysToRemove =
+            _revealedSecrets.Keys
+                .Where(key =>
+                    !existingTaskIds.Contains(
+                        key.TaskId))
+                .ToArray();
+
+        foreach (var key in keysToRemove)
+        {
+            _revealedSecrets.Remove(
+                key);
         }
     }
 
@@ -840,12 +1044,57 @@
             : string.Empty;
     }
 
+    private string? GetRevealedSecret(
+        Guid taskInstanceId,
+        string fieldKey)
+    {
+        return _revealedSecrets
+            .TryGetValue(
+                (
+                    taskInstanceId,
+                    fieldKey
+                ),
+                out var value)
+            ? value
+            : null;
+    }
+
     private int GetCommentLength(
         Guid taskInstanceId)
     {
         return GetCommentDraft(
             taskInstanceId)
             .Length;
+    }
+
+    private bool CanRevealSecrets()
+    {
+        return _currentRoleKeys
+            .Contains(
+                "IT",
+                StringComparer.OrdinalIgnoreCase);
+    }
+
+    private bool CanSaveField(
+        Guid taskInstanceId,
+        MyTaskFieldItem field)
+    {
+        if (IsSavingField(
+            taskInstanceId,
+            field.Key))
+        {
+            return false;
+        }
+
+        if (field.FieldType != 1)
+        {
+            return true;
+        }
+
+        return !string.IsNullOrEmpty(
+            GetFieldDraft(
+                taskInstanceId,
+                field.Key));
     }
 
     private bool IsSavingField(
@@ -868,6 +1117,42 @@
                 taskInstanceId,
                 fieldKey
             );
+    }
+
+    private bool IsRevealingSecret(
+        Guid taskInstanceId,
+        string fieldKey)
+    {
+        return _revealingSecret ==
+            (
+                taskInstanceId,
+                fieldKey
+            );
+    }
+
+    private bool IsSecretRevealed(
+        Guid taskInstanceId,
+        string fieldKey)
+    {
+        return _revealedSecrets
+            .ContainsKey(
+                (
+                    taskInstanceId,
+                    fieldKey
+                ));
+    }
+
+    private static string? GetFieldPlaceholder(
+        MyTaskFieldItem field)
+    {
+        if (field.FieldType != 1)
+        {
+            return null;
+        }
+
+        return field.HasStoredValue
+            ? "Neuen Wert eingeben, um den vorhandenen zu ersetzen"
+            : "Passwort eingeben";
     }
 
     private static string GetFieldInputId(

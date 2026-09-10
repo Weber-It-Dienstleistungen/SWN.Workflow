@@ -1,9 +1,14 @@
 ﻿@page "/login"
 
+@using Microsoft.AspNetCore.Components
+
+@attribute [ExcludeFromInteractiveRouting]
+
 <PageTitle>Anmelden</PageTitle>
 
 <div class="row justify-content-center">
-    <div class="col-md-7 col-lg-5">
+    <div class="col-md-8 col-lg-6">
+
         <div class="mb-4 text-center">
             <h1 class="display-6 fw-semibold mb-2">
                 SWN Workflow
@@ -20,6 +25,7 @@
             </div>
 
             <div class="card-body">
+
                 <form method="post"
                       action="/account/login">
 
@@ -56,16 +62,114 @@
                             type="submit">
                         Anmelden
                     </button>
+
                 </form>
+
             </div>
         </div>
 
-        <div class="alert alert-light border mt-3 small">
-            <strong>Demozugang Personal:</strong>
-            hr.demo
-            <br />
-            <strong>Demozugang IT:</strong>
-            it.demo
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-body fw-semibold">
+                Demo-Benutzer
+            </div>
+
+            <div class="card-body">
+
+                <div class="small text-secondary mb-3">
+                    Gemeinsames Demo-Passwort:
+                    <strong class="text-body">
+                        Demo1234
+                    </strong>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+
+                        <thead>
+                            <tr>
+                                <th scope="col">
+                                    Bereich
+                                </th>
+
+                                <th scope="col">
+                                    Benutzer
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <tr>
+                                <td>
+                                    Personal / HR
+                                </td>
+
+                                <td>
+                                    <code>hr.demo</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    IT
+                                </td>
+
+                                <td>
+                                    <code>it.demo</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    Organisation
+                                </td>
+
+                                <td>
+                                    <code>organisation.demo</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    Telenec
+                                </td>
+
+                                <td>
+                                    <code>telenec.demo</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    Lager
+                                </td>
+
+                                <td>
+                                    <code>lager.demo</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    Leitung / Sonderrollen
+                                </td>
+
+                                <td>
+                                    <code>leitung.demo</code>
+                                </td>
+                            </tr>
+                        </tbody>
+
+                    </table>
+                </div>
+
+                <div class="form-text mt-3">
+                    Diese Konten dienen ausschließlich
+                    der Demonstration des Rollen- und
+                    Aufgabenmodells.
+                </div>
+
+            </div>
         </div>
+
     </div>
 </div>

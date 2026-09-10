@@ -6,32 +6,36 @@ namespace Swn.Workflow.Infrastructure;
 
 public sealed class MyTaskService : IMyTaskService
 {
-    private readonly IDbContextFactory<WorkflowDbContext> _dbContextFactory;
-    private readonly ISecretProtector _secretProtector;
+    private readonly IDbContextFactory<WorkflowDbContext>
+        _dbContextFactory;
 
     public MyTaskService(
-        IDbContextFactory<WorkflowDbContext> dbContextFactory,
-        ISecretProtector secretProtector)
+        IDbContextFactory<WorkflowDbContext> dbContextFactory)
     {
-        ArgumentNullException.ThrowIfNull(dbContextFactory);
-        ArgumentNullException.ThrowIfNull(secretProtector);
+        ArgumentNullException.ThrowIfNull(
+            dbContextFactory);
 
-        _dbContextFactory = dbContextFactory;
-        _secretProtector = secretProtector;
+        _dbContextFactory =
+            dbContextFactory;
     }
 
-    public async Task<IReadOnlyList<MyTaskItem>> GetOpenTasksAsync(
-        string userId,
-        IReadOnlyCollection<string> roleKeys,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<MyTaskItem>>
+        GetOpenTasksAsync(
+            string userId,
+            IReadOnlyCollection<string> roleKeys,
+            CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(userId);
-        ArgumentNullException.ThrowIfNull(roleKeys);
+        ArgumentNullException.ThrowIfNull(
+            userId);
+
+        ArgumentNullException.ThrowIfNull(
+            roleKeys);
 
         var normalizedUserId =
             userId.Trim();
 
-        if (string.IsNullOrWhiteSpace(normalizedUserId))
+        if (string.IsNullOrWhiteSpace(
+            normalizedUserId))
         {
             throw new ArgumentException(
                 "User ID must not be empty.",
@@ -41,33 +45,46 @@ public sealed class MyTaskService : IMyTaskService
         var normalizedRoleKeys =
             roleKeys
                 .Where(role =>
-                    !string.IsNullOrWhiteSpace(role))
+                    !string.IsNullOrWhiteSpace(
+                        role))
                 .Select(role =>
-                    role.Trim().ToUpperInvariant())
+                    role.Trim()
+                        .ToUpperInvariant())
                 .Distinct()
                 .ToArray();
 
         await using var db =
-            await _dbContextFactory.CreateDbContextAsync(
-                cancellationToken);
+            await _dbContextFactory
+                .CreateDbContextAsync(
+                    cancellationToken);
 
         var taskData =
             await (
-                from taskInstance in db.TaskInstances.AsNoTracking()
+                from taskInstance
+                    in db.TaskInstances
+                        .AsNoTracking()
 
-                join taskDefinition in db.TaskDefinitions.AsNoTracking()
+                join taskDefinition
+                    in db.TaskDefinitions
+                        .AsNoTracking()
                     on taskInstance.TaskDefinitionId
                     equals taskDefinition.Id
 
-                join workflowInstance in db.WorkflowInstances.AsNoTracking()
+                join workflowInstance
+                    in db.WorkflowInstances
+                        .AsNoTracking()
                     on taskInstance.WorkflowInstanceId
                     equals workflowInstance.Id
 
-                join workflowVersion in db.WorkflowVersions.AsNoTracking()
+                join workflowVersion
+                    in db.WorkflowVersions
+                        .AsNoTracking()
                     on workflowInstance.WorkflowVersionId
                     equals workflowVersion.Id
 
-                join workflowDefinition in db.WorkflowDefinitions.AsNoTracking()
+                join workflowDefinition
+                    in db.WorkflowDefinitions
+                        .AsNoTracking()
                     on workflowVersion.WorkflowDefinitionId
                     equals workflowDefinition.Id
 
@@ -91,10 +108,12 @@ public sealed class MyTaskService : IMyTaskService
                             normalizedUserId
                         ||
                         (
-                            taskInstance.AssignedUserId == null
+                            taskInstance.AssignedUserId ==
+                                null
                             &&
                             normalizedRoleKeys.Contains(
-                                taskInstance.AssignedRoleKey)
+                                taskInstance
+                                    .AssignedRoleKey)
                         )
                     )
 
@@ -137,7 +156,8 @@ public sealed class MyTaskService : IMyTaskService
 
                     taskInstance.Comment
                 })
-            .ToListAsync(cancellationToken);
+            .ToListAsync(
+                cancellationToken);
 
         if (taskData.Count == 0)
         {
@@ -168,7 +188,8 @@ public sealed class MyTaskService : IMyTaskService
                     field.SortOrder)
                 .ThenBy(field =>
                     field.Key)
-                .ToListAsync(cancellationToken);
+                .ToListAsync(
+                    cancellationToken);
 
         var fieldValues =
             await db.TaskInstanceFieldValues
@@ -176,7 +197,8 @@ public sealed class MyTaskService : IMyTaskService
                 .Where(value =>
                     taskInstanceIds.Contains(
                         value.TaskInstanceId))
-                .ToListAsync(cancellationToken);
+                .ToListAsync(
+                    cancellationToken);
 
         var secretValues =
             await db.TaskInstanceSecrets
@@ -184,37 +206,54 @@ public sealed class MyTaskService : IMyTaskService
                 .Where(secret =>
                     taskInstanceIds.Contains(
                         secret.TaskInstanceId))
-                .ToListAsync(cancellationToken);
+                .Select(secret => new
+                {
+                    secret.TaskInstanceId,
+                    secret.Key
+                })
+                .ToListAsync(
+                    cancellationToken);
 
         var fieldDefinitionsByTask =
             fieldDefinitions
                 .GroupBy(field =>
                     field.TaskDefinitionId)
                 .ToDictionary(
-                    group => group.Key,
-                    group => group.ToArray());
+                    group =>
+                        group.Key,
+                    group =>
+                        group.ToArray());
 
         var fieldValuesByTask =
             fieldValues
                 .GroupBy(value =>
                     value.TaskInstanceId)
                 .ToDictionary(
-                    group => group.Key,
-                    group => group.ToDictionary(
-                        value => value.Key,
-                        value => value.Value,
-                        StringComparer.OrdinalIgnoreCase));
+                    group =>
+                        group.Key,
+                    group =>
+                        group.ToDictionary(
+                            value =>
+                                value.Key,
+                            value =>
+                                value.Value,
+                            StringComparer
+                                .OrdinalIgnoreCase));
 
-        var secretValuesByTask =
+        var secretKeysByTask =
             secretValues
                 .GroupBy(secret =>
                     secret.TaskInstanceId)
                 .ToDictionary(
-                    group => group.Key,
-                    group => group.ToDictionary(
-                        secret => secret.Key,
-                        secret => secret.EncryptedValue,
-                        StringComparer.OrdinalIgnoreCase));
+                    group =>
+                        group.Key,
+                    group =>
+                        group
+                            .Select(secret =>
+                                secret.Key)
+                            .ToHashSet(
+                                StringComparer
+                                    .OrdinalIgnoreCase));
 
         var result =
             new List<MyTaskItem>(
@@ -225,51 +264,57 @@ public sealed class MyTaskService : IMyTaskService
             var fields =
                 new List<MyTaskFieldItem>();
 
-            if (fieldDefinitionsByTask.TryGetValue(
-                task.TaskDefinitionId,
-                out var definitions))
+            if (fieldDefinitionsByTask
+                .TryGetValue(
+                    task.TaskDefinitionId,
+                    out var definitions))
             {
                 fieldValuesByTask.TryGetValue(
                     task.TaskInstanceId,
                     out var values);
 
-                secretValuesByTask.TryGetValue(
+                secretKeysByTask.TryGetValue(
                     task.TaskInstanceId,
-                    out var secrets);
+                    out var secretKeys);
 
                 foreach (var field in definitions)
                 {
                     string? value = null;
 
+                    var hasStoredValue =
+                        false;
+
                     switch (field.FieldType)
                     {
                         case TaskFieldType.Text:
+
                             if (values is not null
                                 &&
                                 values.TryGetValue(
                                     field.Key,
                                     out var storedValue))
                             {
-                                value = storedValue;
+                                value =
+                                    storedValue;
+
+                                hasStoredValue =
+                                    true;
                             }
 
                             break;
 
                         case TaskFieldType.Secret:
-                            if (secrets is not null
+
+                            hasStoredValue =
+                                secretKeys is not null
                                 &&
-                                secrets.TryGetValue(
-                                    field.Key,
-                                    out var encryptedValue))
-                            {
-                                value =
-                                    _secretProtector.Unprotect(
-                                        encryptedValue);
-                            }
+                                secretKeys.Contains(
+                                    field.Key);
 
                             break;
 
                         default:
+
                             throw new InvalidOperationException(
                                 $"Task field type '{field.FieldType}' is not supported.");
                     }
@@ -281,6 +326,7 @@ public sealed class MyTaskService : IMyTaskService
                             (int)field.FieldType,
                             field.SortOrder,
                             field.IsRequired,
+                            hasStoredValue,
                             value));
                 }
             }

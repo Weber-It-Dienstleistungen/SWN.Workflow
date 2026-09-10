@@ -23,4 +23,11 @@ public interface IWorkflowTaskService
         string changedByUserId,
         IReadOnlyCollection<string> roleKeys,
         CancellationToken cancellationToken = default);
+
+    Task<string?> GetSecretFieldValueAsync(
+        Guid taskInstanceId,
+        string fieldKey,
+        string requestedByUserId,
+        IReadOnlyCollection<string> roleKeys,
+        CancellationToken cancellationToken = default);
 }

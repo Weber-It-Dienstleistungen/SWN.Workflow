@@ -13,6 +13,24 @@ public static class TaskFieldSeedData
         await using var db =
             await dbContextFactory.CreateDbContextAsync();
 
+        await SeedCredentialFieldsAsync(
+            db,
+            "ONBOARDING",
+            "ONB-008");
+
+        await SeedCredentialFieldsAsync(
+            db,
+            "ONBOARDING",
+            "ONB-014");
+
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task SeedCredentialFieldsAsync(
+        WorkflowDbContext db,
+        string workflowKey,
+        string taskKey)
+    {
         var taskDefinition =
             await (
                 from task in db.TaskDefinitions
@@ -21,9 +39,9 @@ public static class TaskFieldSeedData
                 join workflow in db.WorkflowDefinitions
                     on version.WorkflowDefinitionId equals workflow.Id
                 where
-                    workflow.Key == "ONBOARDING"
+                    workflow.Key == workflowKey
                     && version.IsPublished
-                    && task.Key == "ONB-008"
+                    && task.Key == taskKey
                 orderby version.VersionNumber descending
                 select task)
             .FirstOrDefaultAsync();
@@ -31,7 +49,7 @@ public static class TaskFieldSeedData
         if (taskDefinition is null)
         {
             throw new InvalidOperationException(
-                "Task definition 'ONB-008' of workflow 'ONBOARDING' was not found.");
+                $"Task definition '{taskKey}' of workflow '{workflowKey}' was not found.");
         }
 
         await AddOrUpdateFieldAsync(
@@ -51,8 +69,6 @@ public static class TaskFieldSeedData
             TaskFieldType.Secret,
             2,
             true);
-
-        await db.SaveChangesAsync();
     }
 
     private static async Task AddOrUpdateFieldAsync(

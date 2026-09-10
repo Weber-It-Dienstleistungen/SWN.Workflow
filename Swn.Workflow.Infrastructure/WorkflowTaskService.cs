@@ -6,18 +6,26 @@ namespace Swn.Workflow.Infrastructure;
 
 public sealed class WorkflowTaskService : IWorkflowTaskService
 {
-    private readonly IDbContextFactory<WorkflowDbContext> _dbContextFactory;
+    private readonly IDbContextFactory<WorkflowDbContext>
+        _dbContextFactory;
+
     private readonly ISecretProtector _secretProtector;
 
     public WorkflowTaskService(
         IDbContextFactory<WorkflowDbContext> dbContextFactory,
         ISecretProtector secretProtector)
     {
-        ArgumentNullException.ThrowIfNull(dbContextFactory);
-        ArgumentNullException.ThrowIfNull(secretProtector);
+        ArgumentNullException.ThrowIfNull(
+            dbContextFactory);
 
-        _dbContextFactory = dbContextFactory;
-        _secretProtector = secretProtector;
+        ArgumentNullException.ThrowIfNull(
+            secretProtector);
+
+        _dbContextFactory =
+            dbContextFactory;
+
+        _secretProtector =
+            secretProtector;
     }
 
     public async Task UpdateStatusAsync(
@@ -27,14 +35,19 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         IReadOnlyCollection<string> roleKeys,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(changedByUserId);
-        ArgumentNullException.ThrowIfNull(roleKeys);
+        ArgumentNullException.ThrowIfNull(
+            changedByUserId);
+
+        ArgumentNullException.ThrowIfNull(
+            roleKeys);
 
         var changedBy =
-            NormalizeUserId(changedByUserId);
+            NormalizeUserId(
+                changedByUserId);
 
         var normalizedRoleKeys =
-            NormalizeRoleKeys(roleKeys);
+            NormalizeRoleKeys(
+                roleKeys);
 
         if (!Enum.IsDefined(
             typeof(WorkflowTaskStatus),
@@ -50,8 +63,9 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
             (WorkflowTaskStatus)status;
 
         await using var db =
-            await _dbContextFactory.CreateDbContextAsync(
-                cancellationToken);
+            await _dbContextFactory
+                .CreateDbContextAsync(
+                    cancellationToken);
 
         var task =
             await db.TaskInstances
@@ -180,17 +194,23 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         IReadOnlyCollection<string> roleKeys,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(changedByUserId);
-        ArgumentNullException.ThrowIfNull(roleKeys);
+        ArgumentNullException.ThrowIfNull(
+            changedByUserId);
+
+        ArgumentNullException.ThrowIfNull(
+            roleKeys);
 
         var changedBy =
-            NormalizeUserId(changedByUserId);
+            NormalizeUserId(
+                changedByUserId);
 
         var normalizedRoleKeys =
-            NormalizeRoleKeys(roleKeys);
+            NormalizeRoleKeys(
+                roleKeys);
 
         var normalizedComment =
-            string.IsNullOrWhiteSpace(comment)
+            string.IsNullOrWhiteSpace(
+                comment)
                 ? null
                 : comment.Trim();
 
@@ -202,8 +222,9 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         }
 
         await using var db =
-            await _dbContextFactory.CreateDbContextAsync(
-                cancellationToken);
+            await _dbContextFactory
+                .CreateDbContextAsync(
+                    cancellationToken);
 
         var task =
             await db.TaskInstances
@@ -256,9 +277,14 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         IReadOnlyCollection<string> roleKeys,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(fieldKey);
-        ArgumentNullException.ThrowIfNull(changedByUserId);
-        ArgumentNullException.ThrowIfNull(roleKeys);
+        ArgumentNullException.ThrowIfNull(
+            fieldKey);
+
+        ArgumentNullException.ThrowIfNull(
+            changedByUserId);
+
+        ArgumentNullException.ThrowIfNull(
+            roleKeys);
 
         var normalizedFieldKey =
             fieldKey.Trim();
@@ -279,14 +305,17 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         }
 
         var changedBy =
-            NormalizeUserId(changedByUserId);
+            NormalizeUserId(
+                changedByUserId);
 
         var normalizedRoleKeys =
-            NormalizeRoleKeys(roleKeys);
+            NormalizeRoleKeys(
+                roleKeys);
 
         await using var db =
-            await _dbContextFactory.CreateDbContextAsync(
-                cancellationToken);
+            await _dbContextFactory
+                .CreateDbContextAsync(
+                    cancellationToken);
 
         var task =
             await db.TaskInstances
@@ -380,7 +409,8 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                             existingSecret);
                     }
 
-                    if (string.IsNullOrEmpty(value))
+                    if (string.IsNullOrEmpty(
+                        value))
                     {
                         if (existingValue is not null)
                         {
@@ -393,10 +423,17 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                         db.TaskInstanceFieldValues.Add(
                             new TaskInstanceFieldValue
                             {
-                                Id = Guid.NewGuid(),
-                                TaskInstanceId = taskInstanceId,
-                                Key = fieldDefinition.Key,
-                                Value = value
+                                Id =
+                                    Guid.NewGuid(),
+
+                                TaskInstanceId =
+                                    taskInstanceId,
+
+                                Key =
+                                    fieldDefinition.Key,
+
+                                Value =
+                                    value
                             });
                     }
                     else
@@ -438,7 +475,8 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                             existingValue);
                     }
 
-                    if (string.IsNullOrEmpty(value))
+                    if (string.IsNullOrEmpty(
+                        value))
                     {
                         if (existingSecret is not null)
                         {
@@ -457,11 +495,20 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                             db.TaskInstanceSecrets.Add(
                                 new TaskInstanceSecret
                                 {
-                                    Id = Guid.NewGuid(),
-                                    TaskInstanceId = taskInstanceId,
-                                    Key = fieldDefinition.Key,
-                                    Label = fieldDefinition.Label,
-                                    EncryptedValue = encryptedValue
+                                    Id =
+                                        Guid.NewGuid(),
+
+                                    TaskInstanceId =
+                                        taskInstanceId,
+
+                                    Key =
+                                        fieldDefinition.Key,
+
+                                    Label =
+                                        fieldDefinition.Label,
+
+                                    EncryptedValue =
+                                        encryptedValue
                                 });
                         }
                         else
@@ -486,10 +533,125 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
             cancellationToken);
     }
 
-    private static async Task EnsureRequiredFieldsHaveValuesAsync(
-        WorkflowDbContext db,
-        TaskInstance task,
-        CancellationToken cancellationToken)
+    public async Task<string?> GetSecretFieldValueAsync(
+        Guid taskInstanceId,
+        string fieldKey,
+        string requestedByUserId,
+        IReadOnlyCollection<string> roleKeys,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(
+            fieldKey);
+
+        ArgumentNullException.ThrowIfNull(
+            requestedByUserId);
+
+        ArgumentNullException.ThrowIfNull(
+            roleKeys);
+
+        var requestedBy =
+            NormalizeUserId(
+                requestedByUserId);
+
+        var normalizedRoleKeys =
+            NormalizeRoleKeys(
+                roleKeys);
+
+        if (!normalizedRoleKeys.Contains(
+            "IT",
+            StringComparer.OrdinalIgnoreCase))
+        {
+            throw new UnauthorizedAccessException(
+                "Only users with the IT role may reveal secret task fields.");
+        }
+
+        var normalizedFieldKey =
+            fieldKey.Trim();
+
+        if (string.IsNullOrWhiteSpace(
+            normalizedFieldKey))
+        {
+            throw new ArgumentException(
+                "Field key must not be empty.",
+                nameof(fieldKey));
+        }
+
+        await using var db =
+            await _dbContextFactory
+                .CreateDbContextAsync(
+                    cancellationToken);
+
+        var task =
+            await db.TaskInstances
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    task =>
+                        task.Id ==
+                        taskInstanceId,
+                    cancellationToken);
+
+        if (task is null)
+        {
+            throw new InvalidOperationException(
+                $"Task instance '{taskInstanceId}' was not found.");
+        }
+
+        EnsureUserMayEditTask(
+            task,
+            requestedBy,
+            normalizedRoleKeys);
+
+        var fieldDefinition =
+            await db.TaskFieldDefinitions
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    field =>
+                        field.TaskDefinitionId ==
+                            task.TaskDefinitionId
+                        &&
+                        field.Key ==
+                            normalizedFieldKey,
+                    cancellationToken);
+
+        if (fieldDefinition is null)
+        {
+            throw new InvalidOperationException(
+                $"Task field '{normalizedFieldKey}' was not found.");
+        }
+
+        if (fieldDefinition.FieldType !=
+            TaskFieldType.Secret)
+        {
+            throw new InvalidOperationException(
+                $"Task field '{normalizedFieldKey}' is not a secret field.");
+        }
+
+        var secret =
+            await db.TaskInstanceSecrets
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    secret =>
+                        secret.TaskInstanceId ==
+                            taskInstanceId
+                        &&
+                        secret.Key ==
+                            fieldDefinition.Key,
+                    cancellationToken);
+
+        if (secret is null)
+        {
+            return null;
+        }
+
+        return _secretProtector.Unprotect(
+            secret.EncryptedValue);
+    }
+
+    private static async Task
+        EnsureRequiredFieldsHaveValuesAsync(
+            WorkflowDbContext db,
+            TaskInstance task,
+            CancellationToken cancellationToken)
     {
         var requiredFields =
             await db.TaskFieldDefinitions
@@ -599,9 +761,11 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
     {
         return roleKeys
             .Where(role =>
-                !string.IsNullOrWhiteSpace(role))
+                !string.IsNullOrWhiteSpace(
+                    role))
             .Select(role =>
-                role.Trim().ToUpperInvariant())
+                role.Trim()
+                    .ToUpperInvariant())
             .Distinct()
             .ToArray();
     }
