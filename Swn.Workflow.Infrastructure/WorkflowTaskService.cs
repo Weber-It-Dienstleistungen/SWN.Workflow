@@ -89,6 +89,15 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         EnsureWorkflowCanBeChanged(
             workflow);
 
+        if (newStatus ==
+            WorkflowTaskStatus.Completed)
+        {
+            await EnsureRequiredFieldsHaveValuesAsync(
+                db,
+                task,
+                cancellationToken);
+        }
+
         task.Status =
             newStatus;
 
@@ -475,6 +484,97 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
 
         await db.SaveChangesAsync(
             cancellationToken);
+    }
+
+    private static async Task EnsureRequiredFieldsHaveValuesAsync(
+        WorkflowDbContext db,
+        TaskInstance task,
+        CancellationToken cancellationToken)
+    {
+        var requiredFields =
+            await db.TaskFieldDefinitions
+                .AsNoTracking()
+                .Where(field =>
+                    field.TaskDefinitionId ==
+                        task.TaskDefinitionId
+                    &&
+                    field.IsRequired)
+                .OrderBy(field =>
+                    field.SortOrder)
+                .ToListAsync(
+                    cancellationToken);
+
+        if (requiredFields.Count == 0)
+        {
+            return;
+        }
+
+        var textValues =
+            await db.TaskInstanceFieldValues
+                .AsNoTracking()
+                .Where(value =>
+                    value.TaskInstanceId ==
+                        task.Id)
+                .ToListAsync(
+                    cancellationToken);
+
+        var secretValues =
+            await db.TaskInstanceSecrets
+                .AsNoTracking()
+                .Where(secret =>
+                    secret.TaskInstanceId ==
+                        task.Id)
+                .ToListAsync(
+                    cancellationToken);
+
+        var missingLabels =
+            new List<string>();
+
+        foreach (var field in requiredFields)
+        {
+            var hasValue =
+                field.FieldType switch
+                {
+                    TaskFieldType.Text =>
+                        textValues.Any(value =>
+                            string.Equals(
+                                value.Key,
+                                field.Key,
+                                StringComparison.OrdinalIgnoreCase)
+                            &&
+                            !string.IsNullOrWhiteSpace(
+                                value.Value)),
+
+                    TaskFieldType.Secret =>
+                        secretValues.Any(secret =>
+                            string.Equals(
+                                secret.Key,
+                                field.Key,
+                                StringComparison.OrdinalIgnoreCase)),
+
+                    _ =>
+                        throw new InvalidOperationException(
+                            $"Task field type '{field.FieldType}' is not supported.")
+                };
+
+            if (!hasValue)
+            {
+                missingLabels.Add(
+                    field.Label);
+            }
+        }
+
+        if (missingLabels.Count > 0)
+        {
+            throw new WorkflowTaskValidationException(
+                "Die Aufgabe kann nicht abgeschlossen werden. "
+                +
+                "Folgende Pflichtfelder fehlen: "
+                +
+                string.Join(
+                    ", ",
+                    missingLabels));
+        }
     }
 
     private static string NormalizeUserId(

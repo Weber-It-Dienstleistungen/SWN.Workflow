@@ -554,6 +554,11 @@
             EnsureCommentDrafts();
             EnsureFieldDrafts();
         }
+        catch (WorkflowTaskValidationException exception)
+        {
+            _errorMessage =
+                exception.Message;
+        }
         catch
         {
             _errorMessage =
