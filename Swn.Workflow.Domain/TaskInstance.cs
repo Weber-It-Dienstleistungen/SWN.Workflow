@@ -16,6 +16,8 @@ public class TaskInstance
 
     public string? Comment { get; set; }
 
+    public string? DecisionOutcomeKey { get; set; }
+
     public string? CompletedByUserId { get; set; }
 
     public DateTime? CompletedAt { get; set; }

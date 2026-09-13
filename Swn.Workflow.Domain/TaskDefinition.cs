@@ -19,4 +19,6 @@ public class TaskDefinition
     public string AssignedRoleKey { get; set; } = string.Empty;
 
     public bool IsOptional { get; set; }
+
+    public TaskType TaskType { get; set; } = TaskType.Work;
 }

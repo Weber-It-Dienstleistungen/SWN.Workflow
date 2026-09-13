@@ -25,6 +25,9 @@ public class WorkflowDbContext
     public DbSet<TaskFieldDefinition> TaskFieldDefinitions =>
         Set<TaskFieldDefinition>();
 
+    public DbSet<TaskDecisionOptionDefinition> TaskDecisionOptionDefinitions =>
+        Set<TaskDecisionOptionDefinition>();
+
     public DbSet<WorkflowInstance> WorkflowInstances =>
         Set<WorkflowInstance>();
 
@@ -150,6 +153,31 @@ public class WorkflowDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<TaskDecisionOptionDefinition>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Key)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Label)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            entity.HasIndex(x => new
+            {
+                x.TaskDefinitionId,
+                x.Key
+            })
+            .IsUnique();
+
+            entity.HasOne<TaskDefinition>()
+                .WithMany()
+                .HasForeignKey(x => x.TaskDefinitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<WorkflowInstance>(entity =>
         {
             entity.HasKey(x => x.Id);
@@ -206,6 +234,9 @@ public class WorkflowDbContext
 
             entity.Property(x => x.Comment)
                 .HasMaxLength(2000);
+
+            entity.Property(x => x.DecisionOutcomeKey)
+                .HasMaxLength(100);
 
             entity.Property(x => x.CompletedByUserId)
                 .HasMaxLength(450);

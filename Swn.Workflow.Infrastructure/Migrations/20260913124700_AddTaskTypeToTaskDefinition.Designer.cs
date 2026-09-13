@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Swn.Workflow.Infrastructure;
 
@@ -10,9 +11,11 @@ using Swn.Workflow.Infrastructure;
 namespace Swn.Workflow.Infrastructure.Migrations
 {
     [DbContext(typeof(WorkflowDbContext))]
-    partial class WorkflowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260913124700_AddTaskTypeToTaskDefinition")]
+    partial class AddTaskTypeToTaskDefinition
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
@@ -145,36 +148,6 @@ namespace Swn.Workflow.Infrastructure.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("Swn.Workflow.Domain.TaskDecisionOptionDefinition", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Label")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<Guid>("TaskDefinitionId")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TaskDefinitionId", "Key")
-                        .IsUnique();
-
-                    b.ToTable("TaskDecisionOptionDefinitions");
-                });
-
             modelBuilder.Entity("Swn.Workflow.Domain.TaskDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -286,10 +259,6 @@ namespace Swn.Workflow.Infrastructure.Migrations
 
                     b.Property<string>("CompletedByUserId")
                         .HasMaxLength(450)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("DecisionOutcomeKey")
-                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Status")
@@ -606,15 +575,6 @@ namespace Swn.Workflow.Infrastructure.Migrations
                     b.HasOne("Swn.Workflow.Infrastructure.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Swn.Workflow.Domain.TaskDecisionOptionDefinition", b =>
-                {
-                    b.HasOne("Swn.Workflow.Domain.TaskDefinition", null)
-                        .WithMany()
-                        .HasForeignKey("TaskDefinitionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
