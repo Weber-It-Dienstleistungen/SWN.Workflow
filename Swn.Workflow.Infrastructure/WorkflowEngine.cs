@@ -91,6 +91,28 @@ public sealed class WorkflowEngine : IWorkflowEngine
                 $"Workflow '{workflowKey}' does not contain any tasks.");
         }
 
+        var taskDefinitionIds =
+            taskDefinitions
+                .Select(task => task.Id)
+                .ToArray();
+
+        var incomingTransitionTargetIds =
+            await db.TaskTransitionDefinitions
+                .AsNoTracking()
+                .Where(transition =>
+                    taskDefinitionIds.Contains(
+                        transition.FromTaskDefinitionId)
+                    &&
+                    taskDefinitionIds.Contains(
+                        transition.ToTaskDefinitionId))
+                .Select(transition =>
+                    transition.ToTaskDefinitionId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+        var blockedTaskDefinitionIds =
+            incomingTransitionTargetIds.ToHashSet();
+
         var normalizedRoleAssignments =
             new Dictionary<string, string>(
                 StringComparer.OrdinalIgnoreCase);
@@ -192,13 +214,19 @@ public sealed class WorkflowEngine : IWorkflowEngine
                 taskDefinition.AssignedRoleKey,
                 out var assignedUserId);
 
+            var initialStatus =
+                blockedTaskDefinitionIds.Contains(
+                    taskDefinition.Id)
+                    ? WorkflowTaskStatus.Blocked
+                    : WorkflowTaskStatus.Open;
+
             db.TaskInstances.Add(
                 new TaskInstance
                 {
                     Id = Guid.NewGuid(),
                     WorkflowInstanceId = workflowInstanceId,
                     TaskDefinitionId = taskDefinition.Id,
-                    Status = WorkflowTaskStatus.Open,
+                    Status = initialStatus,
                     AssignedRoleKey = taskDefinition.AssignedRoleKey,
                     AssignedUserId = assignedUserId
                 });
