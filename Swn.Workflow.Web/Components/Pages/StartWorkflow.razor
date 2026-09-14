@@ -10,6 +10,7 @@
 
 @inject IDashboardService DashboardService
 @inject IWorkflowEngine WorkflowEngine
+@inject IUserDirectoryService UserDirectoryService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
@@ -90,7 +91,7 @@ else
                     <ValidationMessage For="@(() => _model.Subject)" />
                 </div>
 
-                <div class="mb-4">
+                <div class="mb-3">
                     <label class="form-label"
                            for="referenceDate">
                         Stichtag
@@ -102,6 +103,36 @@ else
 
                     <div class="form-text">
                         Beispielsweise Eintritts- oder Austrittsdatum.
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label"
+                           for="supervisor">
+                        Zuständiger Vorgesetzter
+                    </label>
+
+                    <InputSelect id="supervisor"
+                                 class="form-select"
+                                 @bind-Value="_model.SupervisorUserId">
+
+                        <option value="">
+                            Bitte auswählen...
+                        </option>
+
+                        @foreach (var supervisor in _supervisors)
+                        {
+                            <option value="@supervisor.UserId">
+                                @GetUserDisplayName(supervisor)
+                            </option>
+                        }
+                    </InputSelect>
+
+                    <ValidationMessage For="@(() => _model.SupervisorUserId)" />
+
+                    <div class="form-text">
+                        Diese Person übernimmt die Rolle des Vorgesetzten
+                        für genau diesen Vorgang.
                     </div>
                 </div>
 
@@ -139,6 +170,9 @@ else
 
     private AvailableWorkflowItem? _workflow;
 
+    private IReadOnlyList<AssignableUserItem> _supervisors =
+        Array.Empty<AssignableUserItem>();
+
     private StartWorkflowFormModel _model = new();
 
     private bool _isLoading = true;
@@ -161,6 +195,10 @@ else
                     workflow.Key,
                     WorkflowKey,
                     StringComparison.OrdinalIgnoreCase));
+
+        _supervisors =
+            await UserDirectoryService.GetUsersInRoleAsync(
+                "SUPERVISOR");
 
         _isLoading = false;
     }
@@ -192,11 +230,20 @@ else
                     "Der angemeldete Benutzer konnte nicht ermittelt werden.");
             }
 
+            var roleAssignments =
+                new Dictionary<string, string>(
+                    StringComparer.OrdinalIgnoreCase)
+                {
+                    ["SUPERVISOR"] =
+                        _model.SupervisorUserId
+                };
+
             var request = new StartWorkflowRequest(
                 WorkflowKey: _workflow.Key,
                 Subject: _model.Subject,
                 ReferenceDate: _model.ReferenceDate,
-                CreatedByUserId: userId);
+                CreatedByUserId: userId,
+                RoleAssignments: roleAssignments);
 
             await WorkflowEngine.StartAsync(request);
 
@@ -213,6 +260,22 @@ else
         }
     }
 
+    private static string GetUserDisplayName(
+        AssignableUserItem user)
+    {
+        if (!string.IsNullOrWhiteSpace(user.DisplayName))
+        {
+            return user.DisplayName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(user.UserName))
+        {
+            return user.UserName;
+        }
+
+        return user.UserId;
+    }
+
     private sealed class StartWorkflowFormModel
     {
         [Required(
@@ -226,5 +289,11 @@ else
 
         public DateOnly ReferenceDate { get; set; } =
             DateOnly.FromDateTime(DateTime.Today);
+
+        [Required(
+            ErrorMessage =
+                "Bitte einen zuständigen Vorgesetzten auswählen.")]
+        public string SupervisorUserId { get; set; } =
+            string.Empty;
     }
 }
