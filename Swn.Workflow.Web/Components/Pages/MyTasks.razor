@@ -152,6 +152,14 @@
 
                                 </div>
 
+                                <DecisionTaskActions Task="task"
+                                                     CurrentUserId="@(
+                                                     _currentUserId ??
+                                                     string.Empty)"
+                                                     RoleKeys="_currentRoleKeys"
+                                                     DecisionCompleted="
+                                                     HandleDecisionCompletedAsync" />
+
                                 @if (task.Fields.Count > 0)
                                 {
                                     <div class="border rounded p-3 mb-4">
@@ -447,56 +455,81 @@
 
                         <div style="min-width: 210px;">
 
-                            <label class="form-label
-                                small
-                                text-secondary"
-                                   for="@($"status-{task.Id}")">
-                                Status
-                            </label>
+                            @if (task.TaskType == 1)
+                            {
+                                <div class="form-label
+                                    small
+                                    text-secondary">
+                                    Status
+                                </div>
 
-                            <select id="@($"status-{task.Id}")"
-                                    class="form-select"
-                                    value="@task.Status"
-                                    disabled="@(
-                                    _updatingTaskId ==
-                                    task.Id)"
-                                    @onchange="args =>
-                                                                            UpdateTaskStatusAsync(
-                                                                                task.Id,
-                                                                                args)">
+                                <div class="fw-semibold">
+                                    @GetStatusText(
+                                        task.Status)
+                                </div>
+
+                                <div class="small
+                                    text-secondary
+                                    mt-2">
+                                    Diese Aufgabe wird über
+                                    eine Antwort auf die
+                                    Entscheidung abgeschlossen.
+                                </div>
+                            }
+                            else
+                            {
+                                <label class="form-label
+                                    small
+                                    text-secondary"
+                                       for="@($"status-{task.Id}")">
+                                    Status
+                                </label>
+
+                                <select id="@($"status-{task.Id}")"
+                                        class="form-select"
+                                        value="@task.Status"
+                                        disabled="@(
+                                        _updatingTaskId ==
+                                        task.Id)"
+                                        @onchange="args =>
+                                                                                    UpdateTaskStatusAsync(
+                                                                                        task.Id,
+                                                                                        args)">
 
 <option value="0">
-                                    Offen
-                                </option>
+                                        Offen
+                                    </option>
 
-                                <option value="1">
-                                    In Bearbeitung
-                                </option>
+                                    <option value="1">
+                                        In Bearbeitung
+                                    </option>
 
-                                <option value="2">
-                                    Erledigt
-                                </option>
+                                    <option value="2">
+                                        Erledigt
+                                    </option>
 
-                                <option value="3">
-                                    Blockiert
-                                </option>
+                                    <option value="3">
+                                        Blockiert
+                                    </option>
 
-                                <option value="4">
-                                    Nicht erforderlich
-                                </option>
+                                    <option value="4">
+                                        Nicht erforderlich
+                                    </option>
 
-                            </select>
+                                </select>
 
-                            <div class="small text-secondary mt-2">
-                                Erledigte oder nicht erforderliche
-                                Aufgaben verschwinden aus dieser Liste.
-                            </div>
+                                <div class="small text-secondary mt-2">
+                                    Erledigte oder nicht erforderliche
+                                    Aufgaben verschwinden aus dieser Liste.
+                                </div>
+                            }
 
                         </div>
 
                     </div>
 
                 </div>
+
             </div>
         }
 
@@ -618,6 +651,18 @@
                     _currentRoleKeys);
 
         RemoveRevealedSecretsForMissingTasks();
+    }
+
+    private async Task HandleDecisionCompletedAsync()
+    {
+        _errorMessage = null;
+        _savedCommentTaskId = null;
+        _savedField = null;
+
+        await ReloadTasksAsync();
+
+        EnsureCommentDrafts();
+        EnsureFieldDrafts();
     }
 
     private async Task UpdateTaskStatusAsync(
