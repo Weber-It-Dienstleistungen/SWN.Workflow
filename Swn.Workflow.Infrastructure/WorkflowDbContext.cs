@@ -37,6 +37,9 @@ public class WorkflowDbContext
     public DbSet<WorkflowInstanceProperty> WorkflowInstanceProperties =>
         Set<WorkflowInstanceProperty>();
 
+    public DbSet<WorkflowInstanceRoleAssignment> WorkflowInstanceRoleAssignments =>
+        Set<WorkflowInstanceRoleAssignment>();
+
     public DbSet<TaskInstance> TaskInstances =>
         Set<TaskInstance>();
 
@@ -239,6 +242,33 @@ public class WorkflowDbContext
                 x.Key
             })
             .IsUnique();
+
+            entity.HasOne<WorkflowInstance>()
+                .WithMany()
+                .HasForeignKey(x => x.WorkflowInstanceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkflowInstanceRoleAssignment>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.RoleKey)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(x => x.UserId)
+                .IsRequired()
+                .HasMaxLength(450);
+
+            entity.HasIndex(x => new
+            {
+                x.WorkflowInstanceId,
+                x.RoleKey
+            })
+            .IsUnique();
+
+            entity.HasIndex(x => x.UserId);
 
             entity.HasOne<WorkflowInstance>()
                 .WithMany()
