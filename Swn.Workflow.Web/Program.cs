@@ -21,6 +21,7 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IWorkflowDetailService, WorkflowDetailService>();
 builder.Services.AddScoped<IWorkflowTaskService, WorkflowTaskService>();
 builder.Services.AddScoped<IMyTaskService, MyTaskService>();
+builder.Services.AddScoped<IUserDirectoryService, UserDirectoryService>();
 
 var connectionString = builder.Configuration
     .GetConnectionString("WorkflowDatabase")

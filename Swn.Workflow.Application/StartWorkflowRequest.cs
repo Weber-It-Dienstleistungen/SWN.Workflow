@@ -5,4 +5,5 @@ public sealed record StartWorkflowRequest(
     string Subject,
     DateOnly ReferenceDate,
     string CreatedByUserId,
-    IReadOnlyDictionary<string, string>? Properties = null);
+    IReadOnlyDictionary<string, string>? Properties = null,
+    IReadOnlyDictionary<string, string>? RoleAssignments = null);

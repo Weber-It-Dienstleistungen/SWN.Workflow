@@ -91,6 +91,45 @@ public sealed class WorkflowEngine : IWorkflowEngine
                 $"Workflow '{workflowKey}' does not contain any tasks.");
         }
 
+        var normalizedRoleAssignments =
+            new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase);
+
+        if (request.RoleAssignments is not null)
+        {
+            foreach (var roleAssignment in request.RoleAssignments)
+            {
+                var roleKey =
+                    roleAssignment.Key?.Trim().ToUpperInvariant();
+
+                var userId =
+                    roleAssignment.Value?.Trim();
+
+                if (string.IsNullOrWhiteSpace(roleKey))
+                {
+                    throw new ArgumentException(
+                        "Workflow role keys must not be empty.",
+                        nameof(request));
+                }
+
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    throw new ArgumentException(
+                        $"Workflow role '{roleKey}' must have a user assigned.",
+                        nameof(request));
+                }
+
+                if (!normalizedRoleAssignments.TryAdd(
+                    roleKey,
+                    userId))
+                {
+                    throw new ArgumentException(
+                        $"Workflow role '{roleKey}' was assigned more than once.",
+                        nameof(request));
+                }
+            }
+        }
+
         var workflowInstanceId = Guid.NewGuid();
 
         var workflowInstance = new WorkflowInstance
@@ -135,8 +174,24 @@ public sealed class WorkflowEngine : IWorkflowEngine
             }
         }
 
+        foreach (var roleAssignment in normalizedRoleAssignments)
+        {
+            db.WorkflowInstanceRoleAssignments.Add(
+                new WorkflowInstanceRoleAssignment
+                {
+                    Id = Guid.NewGuid(),
+                    WorkflowInstanceId = workflowInstanceId,
+                    RoleKey = roleAssignment.Key,
+                    UserId = roleAssignment.Value
+                });
+        }
+
         foreach (var taskDefinition in taskDefinitions)
         {
+            normalizedRoleAssignments.TryGetValue(
+                taskDefinition.AssignedRoleKey,
+                out var assignedUserId);
+
             db.TaskInstances.Add(
                 new TaskInstance
                 {
@@ -144,7 +199,8 @@ public sealed class WorkflowEngine : IWorkflowEngine
                     WorkflowInstanceId = workflowInstanceId,
                     TaskDefinitionId = taskDefinition.Id,
                     Status = WorkflowTaskStatus.Open,
-                    AssignedRoleKey = taskDefinition.AssignedRoleKey
+                    AssignedRoleKey = taskDefinition.AssignedRoleKey,
+                    AssignedUserId = assignedUserId
                 });
         }
 
