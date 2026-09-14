@@ -1,0 +1,129 @@
+﻿@using Swn.Workflow.Application
+
+@inject IWorkflowTaskService WorkflowTaskService
+
+@if (Task.TaskType == 1)
+{
+    <div class="border rounded p-3 mb-4">
+        <div class="fw-semibold mb-2">
+            Entscheidung
+        </div>
+
+        @if (Task.DecisionOptions is null ||
+             Task.DecisionOptions.Count == 0)
+        {
+            <div class="alert alert-warning mb-0">
+                Für diese Entscheidungsaufgabe sind
+                keine Antwortmöglichkeiten definiert.
+            </div>
+        }
+        else
+        {
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var option in
+                    Task.DecisionOptions
+                        .OrderBy(option => option.SortOrder))
+                {
+                    <button type="button"
+                            class="btn btn-outline-primary"
+                            disabled="@_isSubmitting"
+                            @onclick="() =>
+                                                        CompleteDecisionAsync(option.Key)">
+                        @if (_isSubmitting &&
+                             string.Equals(
+                                 _selectedOutcomeKey,
+                                 option.Key,
+                                 StringComparison.OrdinalIgnoreCase))
+                        {
+                            <span>
+                                Wird gespeichert...
+                            </span>
+                        }
+                        else
+                        {
+                            <span>
+                                @option.Label
+                            </span>
+                        }
+                    </button>
+                }
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div class="alert alert-danger mt-3 mb-0">
+                    @_errorMessage
+                </div>
+            }
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public MyTaskItem Task { get; set; } = default!;
+
+    [Parameter]
+    public string CurrentUserId { get; set; } = string.Empty;
+
+    [Parameter]
+    public IReadOnlyCollection<string> RoleKeys { get; set; } =
+        Array.Empty<string>();
+
+    [Parameter]
+    public EventCallback DecisionCompleted { get; set; }
+
+    private bool _isSubmitting;
+
+    private string? _selectedOutcomeKey;
+
+    private string? _errorMessage;
+
+    private async Task CompleteDecisionAsync(
+        string outcomeKey)
+    {
+        if (_isSubmitting)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(CurrentUserId))
+        {
+            _errorMessage =
+                "Der angemeldete Benutzer konnte nicht ermittelt werden.";
+
+            return;
+        }
+
+        _isSubmitting = true;
+        _selectedOutcomeKey = outcomeKey;
+        _errorMessage = null;
+
+        try
+        {
+            await WorkflowTaskService
+                .CompleteDecisionAsync(
+                    Task.Id,
+                    outcomeKey,
+                    CurrentUserId,
+                    RoleKeys);
+
+            await DecisionCompleted.InvokeAsync();
+        }
+        catch (WorkflowTaskValidationException exception)
+        {
+            _errorMessage =
+                exception.Message;
+        }
+        catch
+        {
+            _errorMessage =
+                "Die Entscheidung konnte nicht gespeichert werden.";
+        }
+        finally
+        {
+            _isSubmitting = false;
+            _selectedOutcomeKey = null;
+        }
+    }
+}
