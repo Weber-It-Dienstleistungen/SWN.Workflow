@@ -9,6 +9,13 @@ public interface IWorkflowTaskService
         IReadOnlyCollection<string> roleKeys,
         CancellationToken cancellationToken = default);
 
+    Task CompleteDecisionAsync(
+        Guid taskInstanceId,
+        string decisionOutcomeKey,
+        string changedByUserId,
+        IReadOnlyCollection<string> roleKeys,
+        CancellationToken cancellationToken = default);
+
     Task UpdateCommentAsync(
         Guid taskInstanceId,
         string? comment,

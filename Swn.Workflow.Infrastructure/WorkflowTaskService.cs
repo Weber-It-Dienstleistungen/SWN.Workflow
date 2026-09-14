@@ -103,9 +103,38 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         EnsureWorkflowCanBeChanged(
             workflow);
 
+        if (task.Status ==
+            WorkflowTaskStatus.Blocked)
+        {
+            throw new WorkflowTaskValidationException(
+                "Eine blockierte Aufgabe kann noch nicht bearbeitet werden.");
+        }
+
         if (newStatus ==
             WorkflowTaskStatus.Completed)
         {
+            var taskDefinition =
+                await db.TaskDefinitions
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(
+                        definition =>
+                            definition.Id ==
+                            task.TaskDefinitionId,
+                        cancellationToken);
+
+            if (taskDefinition is null)
+            {
+                throw new InvalidOperationException(
+                    $"Task definition '{task.TaskDefinitionId}' was not found.");
+            }
+
+            if (taskDefinition.TaskType ==
+                TaskType.Decision)
+            {
+                throw new WorkflowTaskValidationException(
+                    "Entscheidungsaufgaben müssen über eine Antwort abgeschlossen werden.");
+            }
+
             await EnsureRequiredFieldsHaveValuesAsync(
                 db,
                 task,
@@ -133,55 +162,205 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                 null;
         }
 
-        var workflowTasks =
+        if (newStatus ==
+                WorkflowTaskStatus.Completed
+            ||
+            newStatus ==
+                WorkflowTaskStatus.NotRequired)
+        {
+            await ApplyGraphTransitionsAsync(
+                db,
+                workflow.Id,
+                task.TaskDefinitionId,
+                cancellationToken);
+        }
+
+        await UpdateWorkflowStatusAsync(
+            db,
+            workflow,
+            cancellationToken);
+
+        await db.SaveChangesAsync(
+            cancellationToken);
+    }
+
+    public async Task CompleteDecisionAsync(
+        Guid taskInstanceId,
+        string decisionOutcomeKey,
+        string changedByUserId,
+        IReadOnlyCollection<string> roleKeys,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(
+            decisionOutcomeKey);
+
+        ArgumentNullException.ThrowIfNull(
+            changedByUserId);
+
+        ArgumentNullException.ThrowIfNull(
+            roleKeys);
+
+        var normalizedOutcomeKey =
+            decisionOutcomeKey.Trim();
+
+        if (string.IsNullOrWhiteSpace(
+            normalizedOutcomeKey))
+        {
+            throw new ArgumentException(
+                "Decision outcome key must not be empty.",
+                nameof(decisionOutcomeKey));
+        }
+
+        if (normalizedOutcomeKey.Length > 100)
+        {
+            throw new ArgumentException(
+                "Decision outcome key must not exceed 100 characters.",
+                nameof(decisionOutcomeKey));
+        }
+
+        var changedBy =
+            NormalizeUserId(
+                changedByUserId);
+
+        var normalizedRoleKeys =
+            NormalizeRoleKeys(
+                roleKeys);
+
+        await using var db =
+            await _dbContextFactory
+                .CreateDbContextAsync(
+                    cancellationToken);
+
+        var task =
             await db.TaskInstances
-                .Where(taskInstance =>
-                    taskInstance.WorkflowInstanceId ==
-                    workflow.Id)
+                .SingleOrDefaultAsync(
+                    task =>
+                        task.Id ==
+                        taskInstanceId,
+                    cancellationToken);
+
+        if (task is null)
+        {
+            throw new InvalidOperationException(
+                $"Task instance '{taskInstanceId}' was not found.");
+        }
+
+        EnsureUserMayEditTask(
+            task,
+            changedBy,
+            normalizedRoleKeys);
+
+        if (task.Status ==
+            WorkflowTaskStatus.Blocked)
+        {
+            throw new WorkflowTaskValidationException(
+                "Eine blockierte Entscheidung kann noch nicht beantwortet werden.");
+        }
+
+        if (task.Status ==
+                WorkflowTaskStatus.Completed
+            ||
+            task.Status ==
+                WorkflowTaskStatus.NotRequired)
+        {
+            throw new WorkflowTaskValidationException(
+                "Diese Entscheidung ist bereits abgeschlossen.");
+        }
+
+        var workflow =
+            await db.WorkflowInstances
+                .SingleOrDefaultAsync(
+                    workflow =>
+                        workflow.Id ==
+                        task.WorkflowInstanceId,
+                    cancellationToken);
+
+        if (workflow is null)
+        {
+            throw new InvalidOperationException(
+                $"Workflow instance '{task.WorkflowInstanceId}' was not found.");
+        }
+
+        EnsureWorkflowCanBeChanged(
+            workflow);
+
+        var taskDefinition =
+            await db.TaskDefinitions
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    definition =>
+                        definition.Id ==
+                        task.TaskDefinitionId,
+                    cancellationToken);
+
+        if (taskDefinition is null)
+        {
+            throw new InvalidOperationException(
+                $"Task definition '{task.TaskDefinitionId}' was not found.");
+        }
+
+        if (taskDefinition.TaskType !=
+            TaskType.Decision)
+        {
+            throw new WorkflowTaskValidationException(
+                "Diese Aufgabe ist keine Entscheidungsaufgabe.");
+        }
+
+        var decisionOptions =
+            await db.TaskDecisionOptionDefinitions
+                .AsNoTracking()
+                .Where(option =>
+                    option.TaskDefinitionId ==
+                    task.TaskDefinitionId)
+                .OrderBy(option =>
+                    option.SortOrder)
+                .ThenBy(option =>
+                    option.Key)
                 .ToListAsync(
                     cancellationToken);
 
-        var allTasksCompleted =
-            workflowTasks.Count > 0
-            &&
-            workflowTasks.All(
-                taskInstance =>
-                    taskInstance.Status ==
-                        WorkflowTaskStatus.Completed
-                    ||
-                    taskInstance.Status ==
-                        WorkflowTaskStatus.NotRequired);
+        var selectedOption =
+            decisionOptions
+                .SingleOrDefault(
+                    option =>
+                        string.Equals(
+                            option.Key,
+                            normalizedOutcomeKey,
+                            StringComparison.OrdinalIgnoreCase));
 
-        var anyTaskStarted =
-            workflowTasks.Any(
-                taskInstance =>
-                    taskInstance.Status !=
-                        WorkflowTaskStatus.Open);
-
-        if (allTasksCompleted)
+        if (selectedOption is null)
         {
-            workflow.Status =
-                WorkflowStatus.Completed;
-
-            workflow.CompletedAt ??=
-                DateTime.UtcNow;
+            throw new WorkflowTaskValidationException(
+                "Die ausgewählte Antwort ist für diese Entscheidung nicht zulässig.");
         }
-        else if (anyTaskStarted)
-        {
-            workflow.Status =
-                WorkflowStatus.InProgress;
 
-            workflow.CompletedAt =
-                null;
-        }
-        else
-        {
-            workflow.Status =
-                WorkflowStatus.Open;
+        await EnsureRequiredFieldsHaveValuesAsync(
+            db,
+            task,
+            cancellationToken);
 
-            workflow.CompletedAt =
-                null;
-        }
+        task.DecisionOutcomeKey =
+            selectedOption.Key;
+
+        task.Status =
+            WorkflowTaskStatus.Completed;
+
+        task.CompletedAt =
+            DateTime.UtcNow;
+
+        task.CompletedByUserId =
+            changedBy;
+
+        await ApplyGraphTransitionsAsync(
+            db,
+            workflow.Id,
+            task.TaskDefinitionId,
+            cancellationToken);
+
+        await UpdateWorkflowStatusAsync(
+            db,
+            workflow,
+            cancellationToken);
 
         await db.SaveChangesAsync(
             cancellationToken);
@@ -645,6 +824,235 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
 
         return _secretProtector.Unprotect(
             secret.EncryptedValue);
+    }
+
+    private static async Task ApplyGraphTransitionsAsync(
+        WorkflowDbContext db,
+        Guid workflowInstanceId,
+        Guid changedTaskDefinitionId,
+        CancellationToken cancellationToken)
+    {
+        var workflowTasks =
+            await db.TaskInstances
+                .Where(task =>
+                    task.WorkflowInstanceId ==
+                    workflowInstanceId)
+                .ToListAsync(
+                    cancellationToken);
+
+        var taskDefinitionIds =
+            workflowTasks
+                .Select(task =>
+                    task.TaskDefinitionId)
+                .Distinct()
+                .ToArray();
+
+        var transitions =
+            await db.TaskTransitionDefinitions
+                .AsNoTracking()
+                .Where(transition =>
+                    taskDefinitionIds.Contains(
+                        transition.FromTaskDefinitionId)
+                    &&
+                    taskDefinitionIds.Contains(
+                        transition.ToTaskDefinitionId))
+                .ToListAsync(
+                    cancellationToken);
+
+        if (transitions.Count == 0)
+        {
+            return;
+        }
+
+        var taskByDefinitionId =
+            workflowTasks
+                .ToDictionary(
+                    task =>
+                        task.TaskDefinitionId);
+
+        var pendingSources =
+            new Queue<Guid>();
+
+        pendingSources.Enqueue(
+            changedTaskDefinitionId);
+
+        while (pendingSources.Count > 0)
+        {
+            var sourceDefinitionId =
+                pendingSources.Dequeue();
+
+            var targetDefinitionIds =
+                transitions
+                    .Where(transition =>
+                        transition.FromTaskDefinitionId ==
+                        sourceDefinitionId)
+                    .Select(transition =>
+                        transition.ToTaskDefinitionId)
+                    .Distinct()
+                    .ToArray();
+
+            foreach (var targetDefinitionId
+                in targetDefinitionIds)
+            {
+                if (!taskByDefinitionId.TryGetValue(
+                    targetDefinitionId,
+                    out var targetTask))
+                {
+                    throw new InvalidOperationException(
+                        $"Task instance for definition '{targetDefinitionId}' was not found.");
+                }
+
+                if (targetTask.Status !=
+                    WorkflowTaskStatus.Blocked)
+                {
+                    continue;
+                }
+
+                var incomingTransitions =
+                    transitions
+                        .Where(transition =>
+                            transition.ToTaskDefinitionId ==
+                            targetDefinitionId)
+                        .ToArray();
+
+                var hasUnresolvedPredecessor =
+                    false;
+
+                var activeTransitionCount =
+                    0;
+
+                foreach (var incomingTransition
+                    in incomingTransitions)
+                {
+                    if (!taskByDefinitionId.TryGetValue(
+                        incomingTransition
+                            .FromTaskDefinitionId,
+                        out var predecessorTask))
+                    {
+                        throw new InvalidOperationException(
+                            $"Task instance for definition '{incomingTransition.FromTaskDefinitionId}' was not found.");
+                    }
+
+                    switch (predecessorTask.Status)
+                    {
+                        case WorkflowTaskStatus.Completed:
+                            {
+                                var transitionIsActive =
+                                    string.IsNullOrWhiteSpace(
+                                        incomingTransition
+                                            .RequiredDecisionOutcomeKey)
+                                    ||
+                                    string.Equals(
+                                        incomingTransition
+                                            .RequiredDecisionOutcomeKey,
+                                        predecessorTask
+                                            .DecisionOutcomeKey,
+                                        StringComparison
+                                            .OrdinalIgnoreCase);
+
+                                if (transitionIsActive)
+                                {
+                                    activeTransitionCount++;
+                                }
+
+                                break;
+                            }
+
+                        case WorkflowTaskStatus.NotRequired:
+                            break;
+
+                        default:
+                            hasUnresolvedPredecessor =
+                                true;
+                            break;
+                    }
+                }
+
+                if (hasUnresolvedPredecessor)
+                {
+                    continue;
+                }
+
+                if (activeTransitionCount > 0)
+                {
+                    targetTask.Status =
+                        WorkflowTaskStatus.Open;
+                }
+                else
+                {
+                    targetTask.Status =
+                        WorkflowTaskStatus.NotRequired;
+
+                    targetTask.DecisionOutcomeKey =
+                        null;
+
+                    targetTask.CompletedAt =
+                        null;
+
+                    targetTask.CompletedByUserId =
+                        null;
+
+                    pendingSources.Enqueue(
+                        targetTask.TaskDefinitionId);
+                }
+            }
+        }
+    }
+
+    private static async Task UpdateWorkflowStatusAsync(
+        WorkflowDbContext db,
+        WorkflowInstance workflow,
+        CancellationToken cancellationToken)
+    {
+        var workflowTasks =
+            await db.TaskInstances
+                .Where(taskInstance =>
+                    taskInstance.WorkflowInstanceId ==
+                    workflow.Id)
+                .ToListAsync(
+                    cancellationToken);
+
+        var allTasksCompleted =
+            workflowTasks.Count > 0
+            &&
+            workflowTasks.All(
+                taskInstance =>
+                    taskInstance.Status ==
+                        WorkflowTaskStatus.Completed
+                    ||
+                    taskInstance.Status ==
+                        WorkflowTaskStatus.NotRequired);
+
+        var anyTaskStarted =
+            workflowTasks.Any(
+                taskInstance =>
+                    taskInstance.Status !=
+                        WorkflowTaskStatus.Open);
+
+        if (allTasksCompleted)
+        {
+            workflow.Status =
+                WorkflowStatus.Completed;
+
+            workflow.CompletedAt ??=
+                DateTime.UtcNow;
+        }
+        else if (anyTaskStarted)
+        {
+            workflow.Status =
+                WorkflowStatus.InProgress;
+
+            workflow.CompletedAt =
+                null;
+        }
+        else
+        {
+            workflow.Status =
+                WorkflowStatus.Open;
+
+            workflow.CompletedAt =
+                null;
+        }
     }
 
     private static async Task
