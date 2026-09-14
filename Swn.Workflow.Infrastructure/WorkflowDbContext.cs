@@ -28,6 +28,9 @@ public class WorkflowDbContext
     public DbSet<TaskDecisionOptionDefinition> TaskDecisionOptionDefinitions =>
         Set<TaskDecisionOptionDefinition>();
 
+    public DbSet<TaskTransitionDefinition> TaskTransitionDefinitions =>
+        Set<TaskTransitionDefinition>();
+
     public DbSet<WorkflowInstance> WorkflowInstances =>
         Set<WorkflowInstance>();
 
@@ -176,6 +179,28 @@ public class WorkflowDbContext
                 .WithMany()
                 .HasForeignKey(x => x.TaskDefinitionId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TaskTransitionDefinition>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.RequiredDecisionOutcomeKey)
+                .HasMaxLength(100);
+
+            entity.HasIndex(x => x.FromTaskDefinitionId);
+
+            entity.HasIndex(x => x.ToTaskDefinitionId);
+
+            entity.HasOne<TaskDefinition>()
+                .WithMany()
+                .HasForeignKey(x => x.FromTaskDefinitionId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne<TaskDefinition>()
+                .WithMany()
+                .HasForeignKey(x => x.ToTaskDefinitionId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<WorkflowInstance>(entity =>
