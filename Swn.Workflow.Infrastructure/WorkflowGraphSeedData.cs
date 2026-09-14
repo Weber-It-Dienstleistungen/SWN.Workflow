@@ -15,6 +15,18 @@ public static class WorkflowGraphSeedData
             await dbContextFactory
                 .CreateDbContextAsync();
 
+        await ConfigureOnboardingAsync(
+            db);
+
+        await ConfigureOffboardingAsync(
+            db);
+
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task ConfigureOnboardingAsync(
+        WorkflowDbContext db)
+    {
         var onboardingDefinition =
             await db.WorkflowDefinitions
                 .SingleAsync(
@@ -412,6 +424,142 @@ public static class WorkflowGraphSeedData
                     "ONB-025")
             };
 
+        await ConfigureBranchesAsync(
+            db,
+            tasks,
+            branches);
+    }
+
+    private static async Task ConfigureOffboardingAsync(
+        WorkflowDbContext db)
+    {
+        var offboardingDefinition =
+            await db.WorkflowDefinitions
+                .SingleAsync(
+                    definition =>
+                        definition.Key ==
+                        "OFFBOARDING");
+
+        var offboardingVersion =
+            await db.WorkflowVersions
+                .Where(version =>
+                    version.WorkflowDefinitionId ==
+                        offboardingDefinition.Id
+                    &&
+                    version.IsPublished)
+                .OrderByDescending(version =>
+                    version.VersionNumber)
+                .FirstAsync();
+
+        var tasks =
+            await db.TaskDefinitions
+                .Where(task =>
+                    task.WorkflowVersionId ==
+                        offboardingVersion.Id)
+                .ToDictionaryAsync(
+                    task =>
+                        task.Key);
+
+        ConfigureExistingDecisionTask(
+            tasks,
+            "OFF-002",
+            1);
+
+        ConfigureExistingDecisionTask(
+            tasks,
+            "OFF-003",
+            2);
+
+        ConfigureExistingDecisionTask(
+            tasks,
+            "OFF-004",
+            3);
+
+        ConfigureExistingDecisionTask(
+            tasks,
+            "OFF-005",
+            4);
+
+        ConfigureExistingDecisionTask(
+            tasks,
+            "OFF-007",
+            5);
+
+        ConfigureExistingWorkTask(
+            tasks,
+            "OFF-008",
+            108);
+
+        ConfigureExistingWorkTask(
+            tasks,
+            "OFF-010",
+            110);
+
+        ConfigureExistingWorkTask(
+            tasks,
+            "OFF-011",
+            111);
+
+        ConfigureExistingWorkTask(
+            tasks,
+            "OFF-012",
+            112);
+
+        ConfigureExistingWorkTask(
+            tasks,
+            "OFF-013",
+            113);
+
+        ConfigureExistingWorkTask(
+            tasks,
+            "OFF-014",
+            114);
+
+        ConfigureExistingWorkTask(
+            tasks,
+            "OFF-016",
+            116);
+
+        ConfigureExistingWorkTask(
+            tasks,
+            "OFF-018",
+            118);
+
+        var branches =
+            new[]
+            {
+                new DecisionBranch(
+                    "OFF-002",
+                    "OFF-010"),
+
+                new DecisionBranch(
+                    "OFF-003",
+                    "OFF-011"),
+
+                new DecisionBranch(
+                    "OFF-004",
+                    "OFF-012"),
+
+                new DecisionBranch(
+                    "OFF-005",
+                    "OFF-014"),
+
+                new DecisionBranch(
+                    "OFF-007",
+                    "OFF-018")
+            };
+
+        await ConfigureBranchesAsync(
+            db,
+            tasks,
+            branches);
+    }
+
+    private static async Task ConfigureBranchesAsync(
+        WorkflowDbContext db,
+        IReadOnlyDictionary<string, TaskDefinition> tasks,
+        IReadOnlyCollection<DecisionBranch> branches)
+    {
         foreach (var branch in branches)
         {
             var decisionTask =
@@ -440,8 +588,6 @@ public static class WorkflowGraphSeedData
                 targetTask.Id,
                 "YES");
         }
-
-        await db.SaveChangesAsync();
     }
 
     private static void ConfigureExistingDecisionTask(
