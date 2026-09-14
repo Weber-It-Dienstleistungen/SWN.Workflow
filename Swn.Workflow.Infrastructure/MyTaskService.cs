@@ -103,6 +103,9 @@ public sealed class MyTaskService : IMyTaskService
                     taskInstance.Status !=
                         WorkflowTaskStatus.NotRequired
                     &&
+                    taskInstance.Status !=
+                        WorkflowTaskStatus.Blocked
+                    &&
                     (
                         taskInstance.AssignedUserId ==
                             normalizedUserId
