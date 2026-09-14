@@ -847,6 +847,23 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                 .Distinct()
                 .ToArray();
 
+        var decisionTaskDefinitionIds =
+            (
+                await db.TaskDefinitions
+                    .AsNoTracking()
+                    .Where(definition =>
+                        taskDefinitionIds.Contains(
+                            definition.Id)
+                        &&
+                        definition.TaskType ==
+                            TaskType.Decision)
+                    .Select(definition =>
+                        definition.Id)
+                    .ToListAsync(
+                        cancellationToken)
+            )
+            .ToHashSet();
+
         var transitions =
             await db.TaskTransitionDefinitions
                 .AsNoTracking()
@@ -921,6 +938,9 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                 var activeTransitionCount =
                     0;
 
+                var propagatedDecisionComments =
+                    new List<string>();
+
                 foreach (var incomingTransition
                     in incomingTransitions)
                 {
@@ -953,6 +973,18 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                                 if (transitionIsActive)
                                 {
                                     activeTransitionCount++;
+
+                                    if (decisionTaskDefinitionIds
+                                            .Contains(
+                                                predecessorTask
+                                                    .TaskDefinitionId)
+                                        &&
+                                        !string.IsNullOrWhiteSpace(
+                                            predecessorTask.Comment))
+                                    {
+                                        propagatedDecisionComments.Add(
+                                            predecessorTask.Comment);
+                                    }
                                 }
 
                                 break;
@@ -977,6 +1009,10 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                 {
                     targetTask.Status =
                         WorkflowTaskStatus.Open;
+
+                    PropagateDecisionComments(
+                        targetTask,
+                        propagatedDecisionComments);
                 }
                 else
                 {
@@ -997,6 +1033,64 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                 }
             }
         }
+    }
+
+    private static void PropagateDecisionComments(
+        TaskInstance targetTask,
+        IReadOnlyCollection<string> comments)
+    {
+        var normalizedComments =
+            comments
+                .Where(comment =>
+                    !string.IsNullOrWhiteSpace(
+                        comment))
+                .Select(comment =>
+                    comment.Trim())
+                .Distinct(
+                    StringComparer.Ordinal)
+                .ToList();
+
+        if (normalizedComments.Count == 0)
+        {
+            return;
+        }
+
+        var commentParts =
+            new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(
+            targetTask.Comment))
+        {
+            commentParts.Add(
+                targetTask.Comment.Trim());
+        }
+
+        foreach (var comment
+            in normalizedComments)
+        {
+            if (!commentParts.Contains(
+                comment,
+                StringComparer.Ordinal))
+            {
+                commentParts.Add(
+                    comment);
+            }
+        }
+
+        var mergedComment =
+            string.Join(
+                Environment.NewLine +
+                Environment.NewLine,
+                commentParts);
+
+        if (mergedComment.Length > 2000)
+        {
+            throw new WorkflowTaskValidationException(
+                "Die weitergegebenen Entscheidungsnotizen überschreiten die maximal zulässige Länge.");
+        }
+
+        targetTask.Comment =
+            mergedComment;
     }
 
     private static async Task UpdateWorkflowStatusAsync(
