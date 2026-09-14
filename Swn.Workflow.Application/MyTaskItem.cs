@@ -14,4 +14,6 @@ public sealed record MyTaskItem(
     string AssignedRoleKey,
     int Status,
     string? Comment,
-    IReadOnlyList<MyTaskFieldItem> Fields);
+    IReadOnlyList<MyTaskFieldItem> Fields,
+    int TaskType = 0,
+    IReadOnlyList<MyTaskDecisionOptionItem>? DecisionOptions = null);

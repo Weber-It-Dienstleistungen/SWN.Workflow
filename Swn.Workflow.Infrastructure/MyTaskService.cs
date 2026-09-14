@@ -153,6 +153,8 @@ public sealed class MyTaskService : IMyTaskService
 
                     taskDefinition.SortOrder,
 
+                    taskDefinition.TaskType,
+
                     taskInstance.AssignedRoleKey,
 
                     taskInstance.Status,
@@ -194,6 +196,19 @@ public sealed class MyTaskService : IMyTaskService
                 .ToListAsync(
                     cancellationToken);
 
+        var decisionOptions =
+            await db.TaskDecisionOptionDefinitions
+                .AsNoTracking()
+                .Where(option =>
+                    taskDefinitionIds.Contains(
+                        option.TaskDefinitionId))
+                .OrderBy(option =>
+                    option.SortOrder)
+                .ThenBy(option =>
+                    option.Key)
+                .ToListAsync(
+                    cancellationToken);
+
         var fieldValues =
             await db.TaskInstanceFieldValues
                 .AsNoTracking()
@@ -226,6 +241,22 @@ public sealed class MyTaskService : IMyTaskService
                         group.Key,
                     group =>
                         group.ToArray());
+
+        var decisionOptionsByTask =
+            decisionOptions
+                .GroupBy(option =>
+                    option.TaskDefinitionId)
+                .ToDictionary(
+                    group =>
+                        group.Key,
+                    group =>
+                        group
+                            .Select(option =>
+                                new MyTaskDecisionOptionItem(
+                                    option.Key,
+                                    option.Label,
+                                    option.SortOrder))
+                            .ToArray());
 
         var fieldValuesByTask =
             fieldValues
@@ -334,6 +365,10 @@ public sealed class MyTaskService : IMyTaskService
                 }
             }
 
+            decisionOptionsByTask.TryGetValue(
+                task.TaskDefinitionId,
+                out var taskDecisionOptions);
+
             result.Add(
                 new MyTaskItem(
                     task.TaskInstanceId,
@@ -349,7 +384,10 @@ public sealed class MyTaskService : IMyTaskService
                     task.AssignedRoleKey,
                     (int)task.Status,
                     task.Comment,
-                    fields));
+                    fields,
+                    (int)task.TaskType,
+                    taskDecisionOptions ??
+                        Array.Empty<MyTaskDecisionOptionItem>()));
         }
 
         return result;
