@@ -6,6 +6,12 @@ public static class IdentitySeedData
 {
     private const string InitialPassword = "Demo1234";
 
+    private const string BootstrapAdministratorUserName =
+        "prozess.projektsteuerung";
+
+    private const string UserAdministratorRole =
+        "USER_ADMIN";
+
     public static async Task InitializeAsync(
         UserManager<ApplicationUser> userManager,
         RoleManager<IdentityRole> roleManager)
@@ -25,16 +31,18 @@ public static class IdentitySeedData
             "WAREHOUSE",
             "INFORMATION_SECURITY",
             "CONTROL_SYSTEM",
-            "USER_ADMIN"
+            UserAdministratorRole
         };
 
         foreach (var roleName in roles)
         {
-            if (!await roleManager.RoleExistsAsync(roleName))
+            if (!await roleManager.RoleExistsAsync(
+                roleName))
             {
                 var result =
                     await roleManager.CreateAsync(
-                        new IdentityRole(roleName));
+                        new IdentityRole(
+                            roleName));
 
                 EnsureSucceeded(
                     result,
@@ -64,12 +72,12 @@ public static class IdentitySeedData
 
             new UserSeedDefinition(
                 "organisation.demo",
-                "prozess.projektsteuerung",
+                BootstrapAdministratorUserName,
                 "Prozess- und Projektsteuerung",
                 new[]
                 {
                     "ORGANIZATION",
-                    "USER_ADMIN"
+                    UserAdministratorRole
                 }),
 
             new UserSeedDefinition(
@@ -182,25 +190,27 @@ public static class IdentitySeedData
                 })
         };
 
-        foreach (var user in users)
+        foreach (var definition in users)
         {
-            await CreateOrUpdateUserAsync(
+            await CreateOrMigrateUserAsync(
                 userManager,
-                roles,
-                user);
+                definition);
         }
+
+        await EnsureBootstrapAdministratorAsync(
+            userManager);
     }
 
-    private static async Task CreateOrUpdateUserAsync(
+    private static async Task CreateOrMigrateUserAsync(
         UserManager<ApplicationUser> userManager,
-        IReadOnlyCollection<string> managedRoles,
         UserSeedDefinition definition)
     {
         var user =
             await userManager.FindByNameAsync(
                 definition.UserName);
 
-        ApplicationUser? legacyUser = null;
+        ApplicationUser? legacyUser =
+            null;
 
         if (!string.IsNullOrWhiteSpace(
             definition.LegacyUserName))
@@ -224,8 +234,12 @@ public static class IdentitySeedData
                 "Die Benutzer können nicht automatisch zusammengeführt werden.");
         }
 
-        if (user is null &&
-            legacyUser is not null)
+        if (user is not null)
+        {
+            return;
+        }
+
+        if (legacyUser is not null)
         {
             legacyUser.UserName =
                 definition.UserName;
@@ -243,13 +257,16 @@ public static class IdentitySeedData
                 $"konnte nicht nach '{definition.UserName}' " +
                 "migriert werden.");
 
-            user =
-                legacyUser;
+            await AddRolesAsync(
+                userManager,
+                legacyUser,
+                definition.Roles);
+
+            return;
         }
 
-        if (user is null)
-        {
-            user = new ApplicationUser
+        user =
+            new ApplicationUser
             {
                 UserName =
                     definition.UserName,
@@ -264,101 +281,86 @@ public static class IdentitySeedData
                     true
             };
 
-            var createResult =
-                await userManager.CreateAsync(
-                    user,
-                    InitialPassword);
+        var createResult =
+            await userManager.CreateAsync(
+                user,
+                InitialPassword);
 
-            EnsureSucceeded(
-                createResult,
-                $"Benutzer '{definition.UserName}' " +
-                "konnte nicht angelegt werden.");
-        }
-        else if (!string.Equals(
-            user.DisplayName,
-            definition.DisplayName,
-            StringComparison.Ordinal))
-        {
-            user.DisplayName =
-                definition.DisplayName;
+        EnsureSucceeded(
+            createResult,
+            $"Benutzer '{definition.UserName}' " +
+            "konnte nicht angelegt werden.");
 
-            var updateResult =
-                await userManager.UpdateAsync(
-                    user);
-
-            EnsureSucceeded(
-                updateResult,
-                $"Benutzer '{definition.UserName}' " +
-                "konnte nicht aktualisiert werden.");
-        }
-
-        await SynchronizeRolesAsync(
+        await AddRolesAsync(
             userManager,
             user,
-            managedRoles,
             definition.Roles);
     }
 
-    private static async Task SynchronizeRolesAsync(
+    private static async Task AddRolesAsync(
         UserManager<ApplicationUser> userManager,
         ApplicationUser user,
-        IReadOnlyCollection<string> managedRoles,
-        IReadOnlyCollection<string> desiredRoles)
+        IReadOnlyCollection<string> roles)
     {
         var existingRoles =
             await userManager.GetRolesAsync(
                 user);
 
-        var desiredRoleSet =
-            new HashSet<string>(
-                desiredRoles,
-                StringComparer.OrdinalIgnoreCase);
-
-        foreach (var existingRole in existingRoles)
+        foreach (var role in roles)
         {
-            if (!managedRoles.Contains(
-                    existingRole,
-                    StringComparer.OrdinalIgnoreCase) ||
-                desiredRoleSet.Contains(
-                    existingRole))
-            {
-                continue;
-            }
-
-            var removeRoleResult =
-                await userManager.RemoveFromRoleAsync(
-                    user,
-                    existingRole);
-
-            EnsureSucceeded(
-                removeRoleResult,
-                $"Rolle '{existingRole}' konnte Benutzer " +
-                $"'{user.UserName}' nicht entzogen werden.");
-        }
-
-        var currentRoles =
-            await userManager.GetRolesAsync(
-                user);
-
-        foreach (var desiredRole in desiredRoles)
-        {
-            if (currentRoles.Contains(
-                desiredRole,
+            if (existingRoles.Contains(
+                role,
                 StringComparer.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            var addRoleResult =
+            var result =
                 await userManager.AddToRoleAsync(
                     user,
-                    desiredRole);
+                    role);
 
             EnsureSucceeded(
-                addRoleResult,
-                $"Rolle '{desiredRole}' konnte Benutzer " +
+                result,
+                $"Rolle '{role}' konnte Benutzer " +
                 $"'{user.UserName}' nicht zugewiesen werden.");
         }
+    }
+
+    private static async Task
+        EnsureBootstrapAdministratorAsync(
+            UserManager<ApplicationUser> userManager)
+    {
+        var administrators =
+            await userManager.GetUsersInRoleAsync(
+                UserAdministratorRole);
+
+        if (administrators.Count > 0)
+        {
+            return;
+        }
+
+        var bootstrapAdministrator =
+            await userManager.FindByNameAsync(
+                BootstrapAdministratorUserName);
+
+        if (bootstrapAdministrator is null)
+        {
+            throw new InvalidOperationException(
+                $"Der Bootstrap-Administrator " +
+                $"'{BootstrapAdministratorUserName}' wurde nicht gefunden.");
+        }
+
+        var result =
+            await userManager.AddToRoleAsync(
+                bootstrapAdministrator,
+                UserAdministratorRole);
+
+        EnsureSucceeded(
+            result,
+            $"Die Rolle '{UserAdministratorRole}' konnte dem " +
+            $"Bootstrap-Administrator " +
+            $"'{BootstrapAdministratorUserName}' nicht zugewiesen werden.");
     }
 
     private static void EnsureSucceeded(
@@ -374,7 +376,8 @@ public static class IdentitySeedData
             string.Join(
                 "; ",
                 result.Errors.Select(
-                    error => error.Description));
+                    error =>
+                        error.Description));
 
         throw new InvalidOperationException(
             $"{message} {errors}");
