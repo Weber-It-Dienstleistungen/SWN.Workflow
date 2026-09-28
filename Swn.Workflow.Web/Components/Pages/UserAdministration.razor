@@ -431,6 +431,110 @@
 
                     </EditForm>
 
+                    <hr class="my-4" />
+
+                    <div>
+                        <h2 class="h5 mb-2">
+                            Passwort zurücksetzen
+                        </h2>
+
+                        <p class="text-secondary small">
+                            Das bisherige Passwort kann nicht angezeigt werden.
+                            Hier wird stattdessen ein neues Passwort gesetzt.
+                        </p>
+
+                        @if (!string.IsNullOrWhiteSpace(
+                            _passwordResetSuccessMessage))
+                        {
+                            <div class="alert alert-success">
+                                @_passwordResetSuccessMessage
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(
+                            _passwordResetErrorMessage))
+                        {
+                            <div class="alert alert-danger">
+                                @_passwordResetErrorMessage
+                            </div>
+                        }
+
+                        <EditForm Model="_passwordResetModel"
+                                  OnValidSubmit="ResetUserPasswordAsync">
+
+                            <DataAnnotationsValidator />
+
+                            <ValidationSummary />
+
+                            <div class="row">
+
+                                <div class="col-lg-6 mb-3">
+
+                                    <label class="form-label"
+                                           for="resetPassword">
+                                        Neues Passwort
+                                    </label>
+
+                                    <InputText id="resetPassword"
+                                               class="form-control"
+                                               type="password"
+                                               autocomplete="new-password"
+                                               @bind-Value="_passwordResetModel.NewPassword" />
+
+                                    <ValidationMessage
+                                        For="@(() => _passwordResetModel.NewPassword)" />
+
+                                </div>
+
+                                <div class="col-lg-6 mb-3">
+
+                                    <label class="form-label"
+                                           for="resetConfirmPassword">
+                                        Neues Passwort bestätigen
+                                    </label>
+
+                                    <InputText id="resetConfirmPassword"
+                                               class="form-control"
+                                               type="password"
+                                               autocomplete="new-password"
+                                               @bind-Value="_passwordResetModel.ConfirmPassword" />
+
+                                    <ValidationMessage
+                                        For="@(() => _passwordResetModel.ConfirmPassword)" />
+
+                                </div>
+
+                            </div>
+
+                            <div class="form-text mb-3">
+                                Mindestens 8 Zeichen sowie mindestens
+                                ein Großbuchstabe, ein Kleinbuchstabe
+                                und eine Ziffer.
+                            </div>
+
+                            <button class="btn btn-outline-primary"
+                                    type="submit"
+                                    disabled="@_isResettingPassword">
+
+                                @if (_isResettingPassword)
+                                {
+                                    <span>
+                                        Passwort wird zurückgesetzt...
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span>
+                                        Passwort zurücksetzen
+                                    </span>
+                                }
+
+                            </button>
+
+                        </EditForm>
+
+                    </div>
+
                 </div>
             </div>
         }
@@ -623,6 +727,9 @@
 
     private EditUserFormModel? _editModel;
 
+    private PasswordResetFormModel _passwordResetModel =
+        new();
+
     private string _currentUserId =
         string.Empty;
 
@@ -633,6 +740,8 @@
 
     private bool _isUpdating;
 
+    private bool _isResettingPassword;
+
     private string? _loadErrorMessage;
 
     private string? _createErrorMessage;
@@ -642,6 +751,10 @@
     private string? _editErrorMessage;
 
     private string? _updateSuccessMessage;
+
+    private string? _passwordResetErrorMessage;
+
+    private string? _passwordResetSuccessMessage;
 
     private bool IsEditingOwnAccount =>
         _editModel is not null &&
@@ -785,6 +898,12 @@
         _updateSuccessMessage =
             null;
 
+        _passwordResetErrorMessage =
+            null;
+
+        _passwordResetSuccessMessage =
+            null;
+
         _editModel =
             new EditUserFormModel
             {
@@ -819,6 +938,9 @@
                             })
                         .ToList()
             };
+
+        ResetPasswordModel(
+            user.Id);
     }
 
     private void CancelEdit()
@@ -828,6 +950,15 @@
 
         _editErrorMessage =
             null;
+
+        _passwordResetErrorMessage =
+            null;
+
+        _passwordResetSuccessMessage =
+            null;
+
+        _passwordResetModel =
+            new PasswordResetFormModel();
     }
 
     private async Task UpdateUserAsync()
@@ -897,6 +1028,9 @@
             _editModel =
                 null;
 
+            _passwordResetModel =
+                new PasswordResetFormModel();
+
             _updateSuccessMessage =
                 $"Benutzer '{updatedUserName}' wurde aktualisiert.";
         }
@@ -908,6 +1042,62 @@
         finally
         {
             _isUpdating =
+                false;
+        }
+    }
+
+    private async Task ResetUserPasswordAsync()
+    {
+        if (_editModel is null)
+        {
+            return;
+        }
+
+        _isResettingPassword =
+            true;
+
+        _passwordResetErrorMessage =
+            null;
+
+        _passwordResetSuccessMessage =
+            null;
+
+        try
+        {
+            var request =
+                new ResetUserPasswordRequest(
+                    _editModel.UserId,
+                    _passwordResetModel.NewPassword);
+
+            var result =
+                await UserAdministrationService
+                    .ResetPasswordAsync(
+                        request);
+
+            if (!result.Succeeded)
+            {
+                _passwordResetErrorMessage =
+                    string.Join(
+                        " ",
+                        result.Errors);
+
+                return;
+            }
+
+            _passwordResetSuccessMessage =
+                $"Das Passwort für '{_editModel.UserName}' wurde zurückgesetzt.";
+
+            ResetPasswordModel(
+                _editModel.UserId);
+        }
+        catch
+        {
+            _passwordResetErrorMessage =
+                "Das Passwort konnte nicht zurückgesetzt werden.";
+        }
+        finally
+        {
+            _isResettingPassword =
                 false;
         }
     }
@@ -926,6 +1116,17 @@
                                     role
                             })
                         .ToList()
+            };
+    }
+
+    private void ResetPasswordModel(
+        string userId)
+    {
+        _passwordResetModel =
+            new PasswordResetFormModel
+            {
+                UserId =
+                    userId
             };
     }
 
@@ -1052,6 +1253,32 @@
 
         public List<RoleSelectionModel> Roles { get; set; } =
             new();
+    }
+
+    private sealed class PasswordResetFormModel
+    {
+        public string UserId { get; set; } =
+            string.Empty;
+
+        [Required(
+            ErrorMessage =
+                "Bitte ein neues Passwort angeben.")]
+        [MinLength(
+            8,
+            ErrorMessage =
+                "Das Passwort muss mindestens 8 Zeichen lang sein.")]
+        public string NewPassword { get; set; } =
+            string.Empty;
+
+        [Required(
+            ErrorMessage =
+                "Bitte das neue Passwort bestätigen.")]
+        [Compare(
+            nameof(NewPassword),
+            ErrorMessage =
+                "Die beiden Passwörter stimmen nicht überein.")]
+        public string ConfirmPassword { get; set; } =
+            string.Empty;
     }
 
     private sealed class RoleSelectionModel

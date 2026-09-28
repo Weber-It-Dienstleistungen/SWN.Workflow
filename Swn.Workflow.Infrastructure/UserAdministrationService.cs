@@ -439,6 +439,63 @@ public sealed class UserAdministrationService
         return Succeeded();
     }
 
+    public async Task<UserAdministrationOperationResult>
+        ResetPasswordAsync(
+            ResetUserPasswordRequest request,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(
+            request);
+
+        cancellationToken
+            .ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(
+            request.UserId))
+        {
+            return Failed(
+                "Der Benutzer wurde nicht angegeben.");
+        }
+
+        if (string.IsNullOrWhiteSpace(
+            request.NewPassword))
+        {
+            return Failed(
+                "Bitte ein neues Passwort angeben.");
+        }
+
+        var user =
+            await _userManager.FindByIdAsync(
+                request.UserId);
+
+        if (user is null)
+        {
+            return Failed(
+                "Der Benutzer wurde nicht gefunden.");
+        }
+
+        var resetToken =
+            await _userManager
+                .GeneratePasswordResetTokenAsync(
+                    user);
+
+        var resetResult =
+            await _userManager
+                .ResetPasswordAsync(
+                    user,
+                    resetToken,
+                    request.NewPassword);
+
+        if (!resetResult.Succeeded)
+        {
+            return Failed(
+                GetErrors(
+                    resetResult));
+        }
+
+        return Succeeded();
+    }
+
     private async Task<int>
         GetOtherActiveAdministratorsAsync(
             string excludedUserId)
