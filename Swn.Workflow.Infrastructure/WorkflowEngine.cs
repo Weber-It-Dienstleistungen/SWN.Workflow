@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Swn.Workflow.Application;
 using Swn.Workflow.Domain;
 
@@ -6,14 +7,37 @@ namespace Swn.Workflow.Infrastructure;
 
 public sealed class WorkflowEngine : IWorkflowEngine
 {
-    private readonly IDbContextFactory<WorkflowDbContext> _dbContextFactory;
+    private readonly IDbContextFactory<WorkflowDbContext>
+        _dbContextFactory;
+
+    private readonly IWorkflowNotificationService
+        _workflowNotificationService;
+
+    private readonly ILogger<WorkflowEngine>
+        _logger;
 
     public WorkflowEngine(
-        IDbContextFactory<WorkflowDbContext> dbContextFactory)
+        IDbContextFactory<WorkflowDbContext> dbContextFactory,
+        IWorkflowNotificationService workflowNotificationService,
+        ILogger<WorkflowEngine> logger)
     {
-        ArgumentNullException.ThrowIfNull(dbContextFactory);
+        ArgumentNullException.ThrowIfNull(
+            dbContextFactory);
 
-        _dbContextFactory = dbContextFactory;
+        ArgumentNullException.ThrowIfNull(
+            workflowNotificationService);
+
+        ArgumentNullException.ThrowIfNull(
+            logger);
+
+        _dbContextFactory =
+            dbContextFactory;
+
+        _workflowNotificationService =
+            workflowNotificationService;
+
+        _logger =
+            logger;
     }
 
     public async Task<Guid> StartAsync(
@@ -22,25 +46,33 @@ public sealed class WorkflowEngine : IWorkflowEngine
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var workflowKey = request.WorkflowKey.Trim();
-        var subject = request.Subject.Trim();
-        var createdByUserId = request.CreatedByUserId.Trim();
+        var workflowKey =
+            request.WorkflowKey.Trim();
 
-        if (string.IsNullOrWhiteSpace(workflowKey))
+        var subject =
+            request.Subject.Trim();
+
+        var createdByUserId =
+            request.CreatedByUserId.Trim();
+
+        if (string.IsNullOrWhiteSpace(
+            workflowKey))
         {
             throw new ArgumentException(
                 "Workflow key must not be empty.",
                 nameof(request));
         }
 
-        if (string.IsNullOrWhiteSpace(subject))
+        if (string.IsNullOrWhiteSpace(
+            subject))
         {
             throw new ArgumentException(
                 "Workflow subject must not be empty.",
                 nameof(request));
         }
 
-        if (string.IsNullOrWhiteSpace(createdByUserId))
+        if (string.IsNullOrWhiteSpace(
+            createdByUserId))
         {
             throw new ArgumentException(
                 "Creating user must not be empty.",
@@ -48,15 +80,20 @@ public sealed class WorkflowEngine : IWorkflowEngine
         }
 
         await using var db =
-            await _dbContextFactory.CreateDbContextAsync(
-                cancellationToken);
+            await _dbContextFactory
+                .CreateDbContextAsync(
+                    cancellationToken);
 
-        var definition = await db.WorkflowDefinitions
-            .AsNoTracking()
-            .SingleOrDefaultAsync(
-                x => x.Key == workflowKey &&
-                     x.IsActive,
-                cancellationToken);
+        var definition =
+            await db.WorkflowDefinitions
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    x =>
+                        x.Key ==
+                            workflowKey
+                        &&
+                        x.IsActive,
+                    cancellationToken);
 
         if (definition is null)
         {
@@ -64,13 +101,18 @@ public sealed class WorkflowEngine : IWorkflowEngine
                 $"No active workflow definition with key '{workflowKey}' was found.");
         }
 
-        var version = await db.WorkflowVersions
-            .AsNoTracking()
-            .Where(x =>
-                x.WorkflowDefinitionId == definition.Id &&
-                x.IsPublished)
-            .OrderByDescending(x => x.VersionNumber)
-            .FirstOrDefaultAsync(cancellationToken);
+        var version =
+            await db.WorkflowVersions
+                .AsNoTracking()
+                .Where(x =>
+                    x.WorkflowDefinitionId ==
+                        definition.Id
+                    &&
+                    x.IsPublished)
+                .OrderByDescending(x =>
+                    x.VersionNumber)
+                .FirstOrDefaultAsync(
+                    cancellationToken);
 
         if (version is null)
         {
@@ -78,12 +120,18 @@ public sealed class WorkflowEngine : IWorkflowEngine
                 $"No published version for workflow '{workflowKey}' was found.");
         }
 
-        var taskDefinitions = await db.TaskDefinitions
-            .AsNoTracking()
-            .Where(x => x.WorkflowVersionId == version.Id)
-            .OrderBy(x => x.SortOrder)
-            .ThenBy(x => x.Key)
-            .ToListAsync(cancellationToken);
+        var taskDefinitions =
+            await db.TaskDefinitions
+                .AsNoTracking()
+                .Where(x =>
+                    x.WorkflowVersionId ==
+                    version.Id)
+                .OrderBy(x =>
+                    x.SortOrder)
+                .ThenBy(x =>
+                    x.Key)
+                .ToListAsync(
+                    cancellationToken);
 
         if (taskDefinitions.Count == 0)
         {
@@ -93,7 +141,8 @@ public sealed class WorkflowEngine : IWorkflowEngine
 
         var taskDefinitionIds =
             taskDefinitions
-                .Select(task => task.Id)
+                .Select(task =>
+                    task.Id)
                 .ToArray();
 
         var incomingTransitionTargetIds =
@@ -108,10 +157,12 @@ public sealed class WorkflowEngine : IWorkflowEngine
                 .Select(transition =>
                     transition.ToTaskDefinitionId)
                 .Distinct()
-                .ToListAsync(cancellationToken);
+                .ToListAsync(
+                    cancellationToken);
 
         var blockedTaskDefinitionIds =
-            incomingTransitionTargetIds.ToHashSet();
+            incomingTransitionTargetIds
+                .ToHashSet();
 
         var normalizedRoleAssignments =
             new Dictionary<string, string>(
@@ -119,22 +170,28 @@ public sealed class WorkflowEngine : IWorkflowEngine
 
         if (request.RoleAssignments is not null)
         {
-            foreach (var roleAssignment in request.RoleAssignments)
+            foreach (var roleAssignment
+                in request.RoleAssignments)
             {
                 var roleKey =
-                    roleAssignment.Key?.Trim().ToUpperInvariant();
+                    roleAssignment.Key?
+                        .Trim()
+                        .ToUpperInvariant();
 
                 var userId =
-                    roleAssignment.Value?.Trim();
+                    roleAssignment.Value?
+                        .Trim();
 
-                if (string.IsNullOrWhiteSpace(roleKey))
+                if (string.IsNullOrWhiteSpace(
+                    roleKey))
                 {
                     throw new ArgumentException(
                         "Workflow role keys must not be empty.",
                         nameof(request));
                 }
 
-                if (string.IsNullOrWhiteSpace(userId))
+                if (string.IsNullOrWhiteSpace(
+                    userId))
                 {
                     throw new ArgumentException(
                         $"Workflow role '{roleKey}' must have a user assigned.",
@@ -152,26 +209,44 @@ public sealed class WorkflowEngine : IWorkflowEngine
             }
         }
 
-        var workflowInstanceId = Guid.NewGuid();
+        var workflowInstanceId =
+            Guid.NewGuid();
 
-        var workflowInstance = new WorkflowInstance
-        {
-            Id = workflowInstanceId,
-            WorkflowVersionId = version.Id,
-            Subject = subject,
-            ReferenceDate = request.ReferenceDate,
-            Status = WorkflowStatus.Open,
-            CreatedAt = DateTime.UtcNow,
-            CreatedByUserId = createdByUserId
-        };
+        var workflowInstance =
+            new WorkflowInstance
+            {
+                Id =
+                    workflowInstanceId,
 
-        db.WorkflowInstances.Add(workflowInstance);
+                WorkflowVersionId =
+                    version.Id,
+
+                Subject =
+                    subject,
+
+                ReferenceDate =
+                    request.ReferenceDate,
+
+                Status =
+                    WorkflowStatus.Open,
+
+                CreatedAt =
+                    DateTime.UtcNow,
+
+                CreatedByUserId =
+                    createdByUserId
+            };
+
+        db.WorkflowInstances.Add(
+            workflowInstance);
 
         if (request.Properties is not null)
         {
-            foreach (var property in request.Properties)
+            foreach (var property
+                in request.Properties)
             {
-                if (string.IsNullOrWhiteSpace(property.Key))
+                if (string.IsNullOrWhiteSpace(
+                    property.Key))
                 {
                     throw new ArgumentException(
                         "Workflow property keys must not be empty.",
@@ -188,27 +263,46 @@ public sealed class WorkflowEngine : IWorkflowEngine
                 db.WorkflowInstanceProperties.Add(
                     new WorkflowInstanceProperty
                     {
-                        Id = Guid.NewGuid(),
-                        WorkflowInstanceId = workflowInstanceId,
-                        Key = property.Key.Trim(),
-                        Value = property.Value
+                        Id =
+                            Guid.NewGuid(),
+
+                        WorkflowInstanceId =
+                            workflowInstanceId,
+
+                        Key =
+                            property.Key.Trim(),
+
+                        Value =
+                            property.Value
                     });
             }
         }
 
-        foreach (var roleAssignment in normalizedRoleAssignments)
+        foreach (var roleAssignment
+            in normalizedRoleAssignments)
         {
             db.WorkflowInstanceRoleAssignments.Add(
                 new WorkflowInstanceRoleAssignment
                 {
-                    Id = Guid.NewGuid(),
-                    WorkflowInstanceId = workflowInstanceId,
-                    RoleKey = roleAssignment.Key,
-                    UserId = roleAssignment.Value
+                    Id =
+                        Guid.NewGuid(),
+
+                    WorkflowInstanceId =
+                        workflowInstanceId,
+
+                    RoleKey =
+                        roleAssignment.Key,
+
+                    UserId =
+                        roleAssignment.Value
                 });
         }
 
-        foreach (var taskDefinition in taskDefinitions)
+        var initiallyOpenTaskInstanceIds =
+            new List<Guid>();
+
+        foreach (var taskDefinition
+            in taskDefinitions)
         {
             normalizedRoleAssignments.TryGetValue(
                 taskDefinition.AssignedRoleKey,
@@ -220,19 +314,74 @@ public sealed class WorkflowEngine : IWorkflowEngine
                     ? WorkflowTaskStatus.Blocked
                     : WorkflowTaskStatus.Open;
 
-            db.TaskInstances.Add(
+            var taskInstance =
                 new TaskInstance
                 {
-                    Id = Guid.NewGuid(),
-                    WorkflowInstanceId = workflowInstanceId,
-                    TaskDefinitionId = taskDefinition.Id,
-                    Status = initialStatus,
-                    AssignedRoleKey = taskDefinition.AssignedRoleKey,
-                    AssignedUserId = assignedUserId
-                });
+                    Id =
+                        Guid.NewGuid(),
+
+                    WorkflowInstanceId =
+                        workflowInstanceId,
+
+                    TaskDefinitionId =
+                        taskDefinition.Id,
+
+                    Status =
+                        initialStatus,
+
+                    AssignedRoleKey =
+                        taskDefinition.AssignedRoleKey,
+
+                    AssignedUserId =
+                        assignedUserId
+                };
+
+            db.TaskInstances.Add(
+                taskInstance);
+
+            if (initialStatus ==
+                WorkflowTaskStatus.Open)
+            {
+                initiallyOpenTaskInstanceIds.Add(
+                    taskInstance.Id);
+            }
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        await db.SaveChangesAsync(
+            cancellationToken);
+
+        foreach (var taskInstanceId
+            in initiallyOpenTaskInstanceIds)
+        {
+            try
+            {
+                var result =
+                    await _workflowNotificationService
+                        .QueueTaskAvailableAsync(
+                            taskInstanceId,
+                            cancellationToken);
+
+                _logger.LogInformation(
+                    "Initial task notification queued for task " +
+                    "{TaskInstanceId}. Created: {CreatedCount}, " +
+                    "already queued: {AlreadyQueuedCount}, " +
+                    "skipped recipients: {SkippedRecipientCount}.",
+                    taskInstanceId,
+                    result.CreatedCount,
+                    result.AlreadyQueuedCount,
+                    result.SkippedRecipientCount);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "Workflow {WorkflowInstanceId} was created, " +
+                    "but the initial notification for task " +
+                    "{TaskInstanceId} could not be queued.",
+                    workflowInstanceId,
+                    taskInstanceId);
+            }
+        }
 
         return workflowInstanceId;
     }
