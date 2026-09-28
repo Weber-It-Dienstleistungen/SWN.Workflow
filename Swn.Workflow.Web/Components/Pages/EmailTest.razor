@@ -1,0 +1,261 @@
+﻿@page "/admin/email-test"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using Swn.Workflow.Application
+
+@attribute [Authorize(Roles = "USER_ADMIN")]
+
+@inject IEmailSender EmailSender
+
+<PageTitle>E-Mail-Test</PageTitle>
+
+<div class="container-fluid px-0">
+
+    <div class="mb-4">
+        <div class="text-secondary small mb-1">
+            Administration
+        </div>
+
+        <h1 class="display-6 fw-semibold mb-2">
+            E-Mail-Test
+        </h1>
+
+        <p class="text-secondary mb-0">
+            Kontrollierter Funktionstest des konfigurierten
+            SMTP-Versands.
+        </p>
+    </div>
+
+    <div class="alert alert-info">
+        Diese Funktion versendet genau eine Testnachricht
+        an die angegebene Empfängeradresse.
+        Es werden keine Workflow-Aufgaben ausgelöst
+        oder verändert.
+    </div>
+
+    <div class="card shadow-sm">
+
+        <div class="card-header bg-body fw-semibold">
+            Testnachricht senden
+        </div>
+
+        <div class="card-body">
+
+            @if (!string.IsNullOrWhiteSpace(
+                _successMessage))
+            {
+                <div class="alert alert-success">
+                    @_successMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(
+                _errorMessage))
+            {
+                <div class="alert alert-danger">
+                    @_errorMessage
+                </div>
+            }
+
+            <EditForm Model="_model"
+                      OnValidSubmit="SendTestEmailAsync">
+
+                <DataAnnotationsValidator />
+
+                <ValidationSummary />
+
+                <div class="mb-3">
+
+                    <label class="form-label"
+                           for="recipientName">
+                        Empfängername
+                    </label>
+
+                    <InputText id="recipientName"
+                               class="form-control"
+                               autocomplete="off"
+                               @bind-Value="_model.RecipientName" />
+
+                    <div class="form-text">
+                        Optional, beispielsweise „Michael Porzig“.
+                    </div>
+
+                </div>
+
+                <div class="mb-4">
+
+                    <label class="form-label"
+                           for="recipientAddress">
+                        E-Mail-Adresse
+                    </label>
+
+                    <InputText id="recipientAddress"
+                               class="form-control"
+                               type="email"
+                               autocomplete="off"
+                               @bind-Value="_model.RecipientAddress" />
+
+                    <ValidationMessage
+                        For="@(() => _model.RecipientAddress)" />
+
+                </div>
+
+                <div class="card bg-body-tertiary mb-4">
+
+                    <div class="card-body">
+
+                        <div class="small text-secondary mb-1">
+                            Betreff
+                        </div>
+
+                        <div class="fw-semibold mb-3">
+                            SWN Workflow – Testbenachrichtigung
+                        </div>
+
+                        <div class="small text-secondary mb-1">
+                            Inhalt
+                        </div>
+
+                        <div>
+                            Diese Nachricht wurde automatisch vom
+                            neuen SWN Workflow-System erzeugt.
+                            Sie dient ausschließlich als technischer
+                            Funktionstest. Es ist keine Aktion erforderlich.
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <button class="btn btn-primary"
+                        type="submit"
+                        disabled="@_isSending">
+
+                    @if (_isSending)
+                    {
+                        <span>
+                            Test-E-Mail wird gesendet...
+                        </span>
+                    }
+                    else
+                    {
+                        <span>
+                            Test-E-Mail senden
+                        </span>
+                    }
+
+                </button>
+
+            </EditForm>
+
+        </div>
+    </div>
+
+</div>
+
+@code {
+    private readonly EmailTestFormModel _model =
+        new();
+
+    private bool _isSending;
+
+    private string? _successMessage;
+
+    private string? _errorMessage;
+
+    private async Task SendTestEmailAsync()
+    {
+        _isSending =
+            true;
+
+        _successMessage =
+            null;
+
+        _errorMessage =
+            null;
+
+        try
+        {
+            var recipientName =
+                string.IsNullOrWhiteSpace(
+                    _model.RecipientName)
+                    ? null
+                    : _model.RecipientName.Trim();
+
+            var salutation =
+                string.IsNullOrWhiteSpace(
+                    recipientName)
+                    ? "Guten Tag,"
+                    : $"Hallo {recipientName},";
+
+            var sentAt =
+                DateTimeOffset.Now;
+
+            var textBody =
+                $"""
+                {salutation}
+
+                diese Nachricht wurde automatisch vom neuen
+                SWN Workflow-System erzeugt.
+
+                Sie dient ausschließlich als technischer Funktionstest.
+                Es ist keine Aktion erforderlich.
+
+                Zeitpunkt des Tests:
+                {sentAt:dd.MM.yyyy HH:mm:ss zzz}
+
+                Viele Grüße
+                SWN Workflow
+                """;
+
+            var message =
+                new EmailMessage(
+                    _model.RecipientAddress.Trim(),
+                    recipientName,
+                    "SWN Workflow – Testbenachrichtigung",
+                    textBody);
+
+            await EmailSender.SendAsync(
+                message);
+
+            _successMessage =
+                $"Die Test-E-Mail wurde an " +
+                $"'{_model.RecipientAddress.Trim()}' gesendet.";
+        }
+        catch (Exception exception)
+        {
+            _errorMessage =
+                $"Die Test-E-Mail konnte nicht gesendet werden: " +
+                exception.Message;
+        }
+        finally
+        {
+            _isSending =
+                false;
+        }
+    }
+
+    private sealed class EmailTestFormModel
+    {
+        [StringLength(
+            200,
+            ErrorMessage =
+                "Der Empfängername darf maximal 200 Zeichen lang sein.")]
+        public string RecipientName { get; set; } =
+            string.Empty;
+
+        [Required(
+            ErrorMessage =
+                "Bitte eine Empfängeradresse angeben.")]
+        [EmailAddress(
+            ErrorMessage =
+                "Bitte eine gültige E-Mail-Adresse angeben.")]
+        [StringLength(
+            256,
+            ErrorMessage =
+                "Die E-Mail-Adresse darf maximal 256 Zeichen lang sein.")]
+        public string RecipientAddress { get; set; } =
+            string.Empty;
+    }
+}

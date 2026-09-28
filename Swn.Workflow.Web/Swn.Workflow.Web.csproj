@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>Swn.Workflow.Web-20260928</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
