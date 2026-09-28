@@ -23,6 +23,16 @@ builder.Services.AddScoped<IWorkflowTaskService, WorkflowTaskService>();
 builder.Services.AddScoped<IMyTaskService, MyTaskService>();
 builder.Services.AddScoped<IUserDirectoryService, UserDirectoryService>();
 builder.Services.AddScoped<IUserAdministrationService, UserAdministrationService>();
+builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+
+var smtpSettings =
+    builder.Configuration
+        .GetSection("Smtp")
+        .Get<SmtpSettings>()
+    ?? new SmtpSettings();
+
+builder.Services.AddSingleton(
+    smtpSettings);
 
 var connectionString = builder.Configuration
     .GetConnectionString("WorkflowDatabase")
