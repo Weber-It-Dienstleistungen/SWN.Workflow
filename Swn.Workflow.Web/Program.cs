@@ -22,6 +22,7 @@ builder.Services.AddScoped<IWorkflowDetailService, WorkflowDetailService>();
 builder.Services.AddScoped<IWorkflowTaskService, WorkflowTaskService>();
 builder.Services.AddScoped<IMyTaskService, MyTaskService>();
 builder.Services.AddScoped<IUserDirectoryService, UserDirectoryService>();
+builder.Services.AddScoped<IUserAdministrationService, UserAdministrationService>();
 
 var connectionString = builder.Configuration
     .GetConnectionString("WorkflowDatabase")
@@ -78,7 +79,11 @@ app.MapPost(
         SignInManager<ApplicationUser> signInManager,
         IAntiforgery antiforgery) =>
     {
-        await antiforgery.ValidateRequestAsync(httpContext);
+        if (!await antiforgery.IsRequestValidAsync(
+            httpContext))
+        {
+            return Results.Redirect("/login");
+        }
 
         var form =
             await httpContext.Request.ReadFormAsync();
@@ -127,7 +132,11 @@ app.MapPost(
         SignInManager<ApplicationUser> signInManager,
         IAntiforgery antiforgery) =>
     {
-        await antiforgery.ValidateRequestAsync(httpContext);
+        if (!await antiforgery.IsRequestValidAsync(
+            httpContext))
+        {
+            return Results.BadRequest();
+        }
 
         await signInManager.SignOutAsync();
 

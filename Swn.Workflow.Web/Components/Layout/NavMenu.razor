@@ -38,6 +38,21 @@
                     </NavLink>
                 </div>
 
+                <AuthorizeView Roles="USER_ADMIN">
+                    <Authorized>
+
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link"
+                                     href="admin/users">
+                                <span class="bi bi-people-fill"
+                                      aria-hidden="true"></span>
+                                Benutzerverwaltung
+                            </NavLink>
+                        </div>
+
+                    </Authorized>
+                </AuthorizeView>
+
                 <div class="px-3 mt-3">
                     <div class="small text-white-50">
                         Angemeldet als

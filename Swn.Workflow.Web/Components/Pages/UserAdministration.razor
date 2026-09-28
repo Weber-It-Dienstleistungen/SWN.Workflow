@@ -1,0 +1,232 @@
+﻿@page "/admin/users"
+
+@using Microsoft.AspNetCore.Authorization
+@using Swn.Workflow.Application
+
+@attribute [Authorize(Roles = "USER_ADMIN")]
+
+@inject IUserAdministrationService UserAdministrationService
+
+<PageTitle>Benutzerverwaltung</PageTitle>
+
+<div class="container-fluid px-0">
+
+    <div class="mb-4">
+        <div class="text-secondary small mb-1">
+            Administration
+        </div>
+
+        <h1 class="display-6 fw-semibold mb-2">
+            Benutzerverwaltung
+        </h1>
+
+        <p class="text-secondary mb-0">
+            Übersicht der Benutzerkonten,
+            Rollen und hinterlegten E-Mail-Adressen.
+        </p>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-secondary">
+            Benutzer werden geladen...
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(
+        _errorMessage))
+    {
+        <div class="alert alert-danger">
+            @_errorMessage
+        </div>
+    }
+    else
+    {
+        <div class="d-flex
+            flex-column
+            flex-md-row
+            justify-content-between
+            align-items-md-center
+            gap-2
+            mb-3">
+
+            <div class="text-secondary">
+                @_users.Count
+                @GetUserCountText(
+                    _users.Count)
+            </div>
+
+            <div class="small text-secondary">
+                Benutzeränderungen sind in diesem Schritt
+                noch nicht freigeschaltet.
+            </div>
+
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+
+                <div class="table-responsive">
+                    <table class="table
+                        table-hover
+                        align-middle
+                        mb-0">
+
+                        <thead>
+                            <tr>
+                                <th class="ps-4">
+                                    Benutzer
+                                </th>
+
+                                <th>
+                                    Benutzername
+                                </th>
+
+                                <th>
+                                    E-Mail
+                                </th>
+
+                                <th>
+                                    Rollen
+                                </th>
+
+                                <th class="pe-4">
+                                    Status
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            @foreach (var user in _users)
+                            {
+                                <tr @key="user.Id">
+
+                                    <td class="ps-4">
+                                        <div class="fw-semibold">
+                                            @user.DisplayName
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <code>
+                                            @user.UserName
+                                        </code>
+                                    </td>
+
+                                    <td>
+                                        @if (string.IsNullOrWhiteSpace(
+                                            user.Email))
+                                        {
+                                            <span class="text-secondary">
+                                                Nicht hinterlegt
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span>
+                                                @user.Email
+                                            </span>
+                                        }
+                                    </td>
+
+                                    <td>
+                                        <div class="d-flex
+                                            flex-wrap
+                                            gap-1">
+
+                                            @if (user.Roles.Count == 0)
+                                            {
+                                                <span class="text-secondary">
+                                                    Keine Rolle
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                @foreach (var role in
+                                                    user.Roles)
+                                                {
+                                                    <span class="badge
+                                                        text-bg-light
+                                                        border">
+                                                        @role
+                                                    </span>
+                                                }
+                                            }
+
+                                        </div>
+                                    </td>
+
+                                    <td class="pe-4">
+                                        @if (user.IsActive)
+                                        {
+                                            <span class="badge
+                                                text-bg-success">
+                                                Aktiv
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge
+                                                text-bg-secondary">
+                                                Inaktiv
+                                            </span>
+                                        }
+                                    </td>
+
+                                </tr>
+                            }
+
+                        </tbody>
+
+                    </table>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="form-text mt-3">
+            Fehlende E-Mail-Adressen werden im nächsten
+            Ausbauschritt über die Benutzerverwaltung gepflegt.
+            Sie werden nicht aus Benutzer- oder Anzeigenamen abgeleitet.
+        </div>
+    }
+
+</div>
+
+@code {
+    private IReadOnlyList<UserAdministrationItem> _users =
+        Array.Empty<UserAdministrationItem>();
+
+    private bool _isLoading =
+        true;
+
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _users =
+                await UserAdministrationService
+                    .GetUsersAsync();
+        }
+        catch
+        {
+            _errorMessage =
+                "Die Benutzer konnten nicht geladen werden.";
+        }
+        finally
+        {
+            _isLoading =
+                false;
+        }
+    }
+
+    private static string GetUserCountText(
+        int count)
+    {
+        return count == 1
+            ? "Benutzerkonto"
+            : "Benutzerkonten";
+    }
+}
