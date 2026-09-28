@@ -49,6 +49,9 @@ public class WorkflowDbContext
     public DbSet<TaskInstanceSecret> TaskInstanceSecrets =>
         Set<TaskInstanceSecret>();
 
+    public DbSet<WorkflowNotification> WorkflowNotifications =>
+        Set<WorkflowNotification>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -364,6 +367,49 @@ public class WorkflowDbContext
                 .WithMany()
                 .HasForeignKey(x => x.TaskInstanceId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkflowNotification>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.RecipientUserId)
+                .IsRequired()
+                .HasMaxLength(450);
+
+            entity.Property(x => x.RecipientEmail)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.Property(x => x.TriggerKey)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            entity.Property(x => x.LastError)
+                .HasMaxLength(2000);
+
+            entity.HasIndex(x => x.Status);
+
+            entity.HasIndex(x => x.TaskInstanceId);
+
+            entity.HasIndex(x => new
+            {
+                x.WorkflowInstanceId,
+                x.RecipientUserId,
+                x.Type,
+                x.TriggerKey
+            })
+            .IsUnique();
+
+            entity.HasOne<WorkflowInstance>()
+                .WithMany()
+                .HasForeignKey(x => x.WorkflowInstanceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne<TaskInstance>()
+                .WithMany()
+                .HasForeignKey(x => x.TaskInstanceId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }
