@@ -4,7 +4,7 @@ namespace Swn.Workflow.Infrastructure;
 
 public static class IdentitySeedData
 {
-    private const string DemoPassword = "Demo1234";
+    private const string InitialPassword = "Demo1234";
 
     public static async Task InitializeAsync(
         UserManager<ApplicationUser> userManager,
@@ -41,122 +41,318 @@ public static class IdentitySeedData
             }
         }
 
-        await CreateOrUpdateUserAsync(
-            userManager,
-            "hr.demo",
-            "Personal Demo",
-            new[]
-            {
-                "HR"
-            });
+        var users = new[]
+        {
+            new UserSeedDefinition(
+                "hr.demo",
+                "personalwesen",
+                "Personalwesen",
+                new[]
+                {
+                    "HR"
+                }),
 
-        await CreateOrUpdateUserAsync(
-            userManager,
-            "it.demo",
-            "IT Demo",
-            new[]
-            {
-                "IT"
-            });
+            new UserSeedDefinition(
+                "it.demo",
+                "informationstechnik",
+                "Informationstechnik",
+                new[]
+                {
+                    "IT"
+                }),
 
-        await CreateOrUpdateUserAsync(
-            userManager,
-            "organisation.demo",
-            "Organisation Demo",
-            new[]
-            {
-                "ORGANIZATION"
-            });
+            new UserSeedDefinition(
+                "organisation.demo",
+                "prozess.projektsteuerung",
+                "Prozess- und Projektsteuerung",
+                new[]
+                {
+                    "ORGANIZATION"
+                }),
 
-        await CreateOrUpdateUserAsync(
-            userManager,
-            "telenec.demo",
-            "Telenec Demo",
-            new[]
-            {
-                "TELENEC"
-            });
+            new UserSeedDefinition(
+                "telenec.demo",
+                "telenec",
+                "Telenec",
+                new[]
+                {
+                    "TELENEC"
+                }),
 
-        await CreateOrUpdateUserAsync(
-            userManager,
-            "lager.demo",
-            "Lager Demo",
-            new[]
-            {
-                "WAREHOUSE"
-            });
+            new UserSeedDefinition(
+                "lager.demo",
+                "einkauf.lager",
+                "Einkauf/Lager",
+                new[]
+                {
+                    "WAREHOUSE"
+                }),
 
-        await CreateOrUpdateUserAsync(
-            userManager,
-            "leitung.demo",
-            "Leitung Demo",
-            new[]
-            {
-                "SUPERVISOR",
-                "EXECUTIVE_SECRETARIAT",
-                "TECHNICAL_MANAGEMENT",
-                "INFORMATION_SECURITY",
-                "CONTROL_SYSTEM"
-            });
+            new UserSeedDefinition(
+                "leitung.demo",
+                "geschaeftsfuehrung",
+                "Geschäftsführung",
+                new[]
+                {
+                    "SUPERVISOR"
+                }),
+
+            new UserSeedDefinition(
+                null,
+                "sekretariat",
+                "Sekretariat",
+                new[]
+                {
+                    "EXECUTIVE_SECRETARIAT"
+                }),
+
+            new UserSeedDefinition(
+                null,
+                "hauptabteilungsleitung.kaufmaennische.abteilung",
+                "Kaufm. Abteilung – Hauptabteilungsleitung",
+                new[]
+                {
+                    "SUPERVISOR"
+                }),
+
+            new UserSeedDefinition(
+                null,
+                "hauptabteilungsleitung.technische.abteilung",
+                "Technische Abteilung – Hauptabteilungsleitung",
+                new[]
+                {
+                    "SUPERVISOR",
+                    "TECHNICAL_MANAGEMENT"
+                }),
+
+            new UserSeedDefinition(
+                null,
+                "abteilungsleitung.netz.technische.anlagen",
+                "Netz und techn. Anlagen – Abteilungsleitung",
+                new[]
+                {
+                    "SUPERVISOR"
+                }),
+
+            new UserSeedDefinition(
+                null,
+                "bereichsleitung.strom",
+                "Strom – Bereichsleitung",
+                new[]
+                {
+                    "SUPERVISOR"
+                }),
+
+            new UserSeedDefinition(
+                null,
+                "bereichsleitung.gw.waerme",
+                "G/W und Wärme – Bereichsleitung",
+                new[]
+                {
+                    "SUPERVISOR"
+                }),
+
+            new UserSeedDefinition(
+                null,
+                "abteilungsleitung.telenec",
+                "Telenec – Abteilungsleitung",
+                new[]
+                {
+                    "SUPERVISOR"
+                }),
+
+            new UserSeedDefinition(
+                null,
+                "informationssicherheitsbeauftragter.ext",
+                "Informationssicherheitsbeauftragter (ext.)",
+                new[]
+                {
+                    "INFORMATION_SECURITY"
+                }),
+
+            new UserSeedDefinition(
+                null,
+                "leitsystem",
+                "Leitsystem (Workflowbegriff – Zuordnung offen)",
+                new[]
+                {
+                    "CONTROL_SYSTEM"
+                })
+        };
+
+        foreach (var user in users)
+        {
+            await CreateOrUpdateUserAsync(
+                userManager,
+                roles,
+                user);
+        }
     }
 
     private static async Task CreateOrUpdateUserAsync(
         UserManager<ApplicationUser> userManager,
-        string userName,
-        string displayName,
-        IReadOnlyCollection<string> roles)
+        IReadOnlyCollection<string> managedRoles,
+        UserSeedDefinition definition)
     {
         var user =
-            await userManager.FindByNameAsync(userName);
+            await userManager.FindByNameAsync(
+                definition.UserName);
+
+        ApplicationUser? legacyUser = null;
+
+        if (!string.IsNullOrWhiteSpace(
+            definition.LegacyUserName))
+        {
+            legacyUser =
+                await userManager.FindByNameAsync(
+                    definition.LegacyUserName);
+        }
+
+        if (user is not null &&
+            legacyUser is not null &&
+            !string.Equals(
+                user.Id,
+                legacyUser.Id,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Sowohl der neue Benutzer " +
+                $"'{definition.UserName}' als auch der bisherige Benutzer " +
+                $"'{definition.LegacyUserName}' existieren bereits. " +
+                "Die Benutzer können nicht automatisch zusammengeführt werden.");
+        }
+
+        if (user is null &&
+            legacyUser is not null)
+        {
+            legacyUser.UserName =
+                definition.UserName;
+
+            legacyUser.DisplayName =
+                definition.DisplayName;
+
+            var migrationResult =
+                await userManager.UpdateAsync(
+                    legacyUser);
+
+            EnsureSucceeded(
+                migrationResult,
+                $"Benutzer '{definition.LegacyUserName}' " +
+                $"konnte nicht nach '{definition.UserName}' " +
+                "migriert werden.");
+
+            user =
+                legacyUser;
+        }
 
         if (user is null)
         {
             user = new ApplicationUser
             {
-                UserName = userName,
-                DisplayName = displayName,
-                EmailConfirmed = true
+                UserName =
+                    definition.UserName,
+
+                DisplayName =
+                    definition.DisplayName,
+
+                EmailConfirmed =
+                    true
             };
 
             var createResult =
                 await userManager.CreateAsync(
                     user,
-                    DemoPassword);
+                    InitialPassword);
 
             EnsureSucceeded(
                 createResult,
-                $"Benutzer '{userName}' konnte nicht angelegt werden.");
+                $"Benutzer '{definition.UserName}' " +
+                "konnte nicht angelegt werden.");
         }
-        else if (user.DisplayName != displayName)
+        else if (!string.Equals(
+            user.DisplayName,
+            definition.DisplayName,
+            StringComparison.Ordinal))
         {
-            user.DisplayName = displayName;
+            user.DisplayName =
+                definition.DisplayName;
 
             var updateResult =
-                await userManager.UpdateAsync(user);
+                await userManager.UpdateAsync(
+                    user);
 
             EnsureSucceeded(
                 updateResult,
-                $"Benutzer '{userName}' konnte nicht aktualisiert werden.");
+                $"Benutzer '{definition.UserName}' " +
+                "konnte nicht aktualisiert werden.");
         }
 
-        var existingRoles =
-            await userManager.GetRolesAsync(user);
+        await SynchronizeRolesAsync(
+            userManager,
+            user,
+            managedRoles,
+            definition.Roles);
+    }
 
-        foreach (var role in roles)
+    private static async Task SynchronizeRolesAsync(
+        UserManager<ApplicationUser> userManager,
+        ApplicationUser user,
+        IReadOnlyCollection<string> managedRoles,
+        IReadOnlyCollection<string> desiredRoles)
+    {
+        var existingRoles =
+            await userManager.GetRolesAsync(
+                user);
+
+        var desiredRoleSet =
+            new HashSet<string>(
+                desiredRoles,
+                StringComparer.OrdinalIgnoreCase);
+
+        foreach (var existingRole in existingRoles)
         {
-            if (!existingRoles.Contains(
-                role,
+            if (!managedRoles.Contains(
+                    existingRole,
+                    StringComparer.OrdinalIgnoreCase) ||
+                desiredRoleSet.Contains(
+                    existingRole))
+            {
+                continue;
+            }
+
+            var removeRoleResult =
+                await userManager.RemoveFromRoleAsync(
+                    user,
+                    existingRole);
+
+            EnsureSucceeded(
+                removeRoleResult,
+                $"Rolle '{existingRole}' konnte Benutzer " +
+                $"'{user.UserName}' nicht entzogen werden.");
+        }
+
+        var currentRoles =
+            await userManager.GetRolesAsync(
+                user);
+
+        foreach (var desiredRole in desiredRoles)
+        {
+            if (currentRoles.Contains(
+                desiredRole,
                 StringComparer.OrdinalIgnoreCase))
             {
-                var addRoleResult =
-                    await userManager.AddToRoleAsync(
-                        user,
-                        role);
-
-                EnsureSucceeded(
-                    addRoleResult,
-                    $"Rolle '{role}' konnte Benutzer '{userName}' nicht zugewiesen werden.");
+                continue;
             }
+
+            var addRoleResult =
+                await userManager.AddToRoleAsync(
+                    user,
+                    desiredRole);
+
+            EnsureSucceeded(
+                addRoleResult,
+                $"Rolle '{desiredRole}' konnte Benutzer " +
+                $"'{user.UserName}' nicht zugewiesen werden.");
         }
     }
 
@@ -178,4 +374,10 @@ public static class IdentitySeedData
         throw new InvalidOperationException(
             $"{message} {errors}");
     }
+
+    private sealed record UserSeedDefinition(
+        string? LegacyUserName,
+        string UserName,
+        string DisplayName,
+        IReadOnlyCollection<string> Roles);
 }
