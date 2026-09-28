@@ -7,7 +7,7 @@
 <PageTitle>Anmelden</PageTitle>
 
 <div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
+    <div class="col-md-10 col-lg-8">
 
         <div class="mb-4 text-center">
             <h1 class="display-6 fw-semibold mb-2">
@@ -70,13 +70,13 @@
 
         <div class="card shadow-sm mt-3">
             <div class="card-header bg-body fw-semibold">
-                Demo-Benutzer
+                Arbeitsbenutzer
             </div>
 
             <div class="card-body">
 
                 <div class="small text-secondary mb-3">
-                    Gemeinsames Demo-Passwort:
+                    Gemeinsames Initialpasswort:
                     <strong class="text-body">
                         Demo1234
                     </strong>
@@ -88,11 +88,11 @@
                         <thead>
                             <tr>
                                 <th scope="col">
-                                    Bereich
+                                    Organisationseinheit / Funktion
                                 </th>
 
                                 <th scope="col">
-                                    Benutzer
+                                    Benutzername
                                 </th>
                             </tr>
                         </thead>
@@ -100,31 +100,111 @@
                         <tbody>
                             <tr>
                                 <td>
-                                    Personal / HR
+                                    Geschäftsführung
                                 </td>
 
                                 <td>
-                                    <code>hr.demo</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    IT
-                                </td>
-
-                                <td>
-                                    <code>it.demo</code>
+                                    <code>geschaeftsfuehrung</code>
                                 </td>
                             </tr>
 
                             <tr>
                                 <td>
-                                    Organisation
+                                    Sekretariat
                                 </td>
 
                                 <td>
-                                    <code>organisation.demo</code>
+                                    <code>sekretariat</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    Prozess- und Projektsteuerung
+                                </td>
+
+                                <td>
+                                    <code>prozess.projektsteuerung</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    Kaufm. Abteilung – Hauptabteilungsleitung
+                                </td>
+
+                                <td>
+                                    <code>hauptabteilungsleitung.kaufmaennische.abteilung</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    Personalwesen
+                                </td>
+
+                                <td>
+                                    <code>personalwesen</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    Technische Abteilung – Hauptabteilungsleitung
+                                </td>
+
+                                <td>
+                                    <code>hauptabteilungsleitung.technische.abteilung</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    Netz und techn. Anlagen – Abteilungsleitung
+                                </td>
+
+                                <td>
+                                    <code>abteilungsleitung.netz.technische.anlagen</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    Strom – Bereichsleitung
+                                </td>
+
+                                <td>
+                                    <code>bereichsleitung.strom</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    G/W und Wärme – Bereichsleitung
+                                </td>
+
+                                <td>
+                                    <code>bereichsleitung.gw.waerme</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    Informationstechnik
+                                </td>
+
+                                <td>
+                                    <code>informationstechnik</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    Einkauf/Lager
+                                </td>
+
+                                <td>
+                                    <code>einkauf.lager</code>
                                 </td>
                             </tr>
 
@@ -134,27 +214,41 @@
                                 </td>
 
                                 <td>
-                                    <code>telenec.demo</code>
+                                    <code>telenec</code>
                                 </td>
                             </tr>
 
                             <tr>
                                 <td>
-                                    Lager
+                                    Telenec – Abteilungsleitung
                                 </td>
 
                                 <td>
-                                    <code>lager.demo</code>
+                                    <code>abteilungsleitung.telenec</code>
                                 </td>
                             </tr>
 
                             <tr>
                                 <td>
-                                    Leitung / Sonderrollen
+                                    Informationssicherheitsbeauftragter (ext.)
                                 </td>
 
                                 <td>
-                                    <code>leitung.demo</code>
+                                    <code>informationssicherheitsbeauftragter.ext</code>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>
+                                    Leitsystem
+
+                                    <div class="small text-warning-emphasis">
+                                        Workflowbegriff – Zuordnung zum Organigramm noch offen
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <code>leitsystem</code>
                                 </td>
                             </tr>
                         </tbody>
@@ -163,9 +257,10 @@
                 </div>
 
                 <div class="form-text mt-3">
-                    Diese Konten dienen ausschließlich
-                    der Demonstration des Rollen- und
-                    Aufgabenmodells.
+                    Die Benutzerstruktur orientiert sich an den
+                    Organisationseinheiten und Funktionen des aktuellen
+                    Organigramms. Abweichende Workflowbegriffe werden
+                    bis zur fachlichen Klärung ausdrücklich gekennzeichnet.
                 </div>
 
             </div>
