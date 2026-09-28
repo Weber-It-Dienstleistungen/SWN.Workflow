@@ -1,5 +1,6 @@
 ﻿@page "/admin/users"
 
+@using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Authorization
 @using Swn.Workflow.Application
 
@@ -21,8 +22,7 @@
         </h1>
 
         <p class="text-secondary mb-0">
-            Übersicht der Benutzerkonten,
-            Rollen und hinterlegten E-Mail-Adressen.
+            Benutzerkonten, Rollen und E-Mail-Adressen verwalten.
         </p>
     </div>
 
@@ -33,14 +33,214 @@
         </div>
     }
     else if (!string.IsNullOrWhiteSpace(
-        _errorMessage))
+        _loadErrorMessage))
     {
         <div class="alert alert-danger">
-            @_errorMessage
+            @_loadErrorMessage
         </div>
     }
     else
     {
+        <div class="card shadow-sm mb-4">
+
+            <div class="card-header bg-body fw-semibold">
+                Benutzer anlegen
+            </div>
+
+            <div class="card-body">
+
+                @if (!string.IsNullOrWhiteSpace(
+                    _createSuccessMessage))
+                {
+                    <div class="alert alert-success">
+                        @_createSuccessMessage
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(
+                    _createErrorMessage))
+                {
+                    <div class="alert alert-danger">
+                        @_createErrorMessage
+                    </div>
+                }
+
+                <EditForm Model="_createModel"
+                          OnValidSubmit="CreateUserAsync">
+
+                    <DataAnnotationsValidator />
+
+                    <ValidationSummary />
+
+                    <div class="row">
+
+                        <div class="col-lg-6 mb-3">
+
+                            <label class="form-label"
+                                   for="displayName">
+                                Anzeigename
+                            </label>
+
+                            <InputText id="displayName"
+                                       class="form-control"
+                                       @bind-Value="_createModel.DisplayName" />
+
+                            <ValidationMessage
+                                For="@(() => _createModel.DisplayName)" />
+
+                            <div class="form-text">
+                                Beispielsweise die Organisationseinheit
+                                oder Funktion laut Organigramm.
+                            </div>
+
+                        </div>
+
+                        <div class="col-lg-6 mb-3">
+
+                            <label class="form-label"
+                                   for="userName">
+                                Benutzername
+                            </label>
+
+                            <InputText id="userName"
+                                       class="form-control"
+                                       autocomplete="off"
+                                       @bind-Value="_createModel.UserName" />
+
+                            <ValidationMessage
+                                For="@(() => _createModel.UserName)" />
+
+                        </div>
+
+                    </div>
+
+                    <div class="mb-3">
+
+                        <label class="form-label"
+                               for="email">
+                            E-Mail-Adresse
+                        </label>
+
+                        <InputText id="email"
+                                   class="form-control"
+                                   type="email"
+                                   autocomplete="off"
+                                   @bind-Value="_createModel.Email" />
+
+                        <ValidationMessage
+                            For="@(() => _createModel.Email)" />
+
+                        <div class="form-text">
+                            Diese Adresse wird später auch für
+                            Workflow-Benachrichtigungen verwendet.
+                        </div>
+
+                    </div>
+
+                    <div class="row">
+
+                        <div class="col-lg-6 mb-3">
+
+                            <label class="form-label"
+                                   for="password">
+                                Initialpasswort
+                            </label>
+
+                            <InputText id="password"
+                                       class="form-control"
+                                       type="password"
+                                       autocomplete="new-password"
+                                       @bind-Value="_createModel.Password" />
+
+                            <ValidationMessage
+                                For="@(() => _createModel.Password)" />
+
+                        </div>
+
+                        <div class="col-lg-6 mb-3">
+
+                            <label class="form-label"
+                                   for="confirmPassword">
+                                Initialpasswort bestätigen
+                            </label>
+
+                            <InputText id="confirmPassword"
+                                       class="form-control"
+                                       type="password"
+                                       autocomplete="new-password"
+                                       @bind-Value="_createModel.ConfirmPassword" />
+
+                            <ValidationMessage
+                                For="@(() => _createModel.ConfirmPassword)" />
+
+                        </div>
+
+                    </div>
+
+                    <div class="form-text mb-4">
+                        Mindestens 8 Zeichen sowie mindestens
+                        ein Großbuchstabe, ein Kleinbuchstabe
+                        und eine Ziffer.
+                    </div>
+
+                    <div class="mb-4">
+
+                        <label class="form-label">
+                            Rollen
+                        </label>
+
+                        <div class="row row-cols-1 row-cols-md-2 g-2">
+
+                            @foreach (var role in _createModel.Roles)
+                            {
+                                <div class="col"
+                                     @key="role.RoleName">
+
+                                    <div class="form-check border rounded p-3">
+
+                                        <InputCheckbox
+                                            id="@GetRoleCheckboxId(role.RoleName)"
+                                            class="form-check-input ms-0 me-2"
+                                            @bind-Value="role.IsSelected" />
+
+                                        <label class="form-check-label"
+                                               for="@GetRoleCheckboxId(role.RoleName)">
+                                            @role.RoleName
+                                        </label>
+
+                                    </div>
+
+                                </div>
+                            }
+
+                        </div>
+
+                    </div>
+
+                    <button class="btn btn-primary"
+                            type="submit"
+                            disabled="@_isCreating">
+
+                        @if (_isCreating)
+                        {
+                            <span>
+                                Benutzer wird angelegt...
+                            </span>
+                        }
+                        else
+                        {
+                            <span>
+                                Benutzer anlegen
+                            </span>
+                        }
+
+                    </button>
+
+                </EditForm>
+
+            </div>
+        </div>
+
         <div class="d-flex
             flex-column
             flex-md-row
@@ -56,8 +256,8 @@
             </div>
 
             <div class="small text-secondary">
-                Benutzeränderungen sind in diesem Schritt
-                noch nicht freigeschaltet.
+                Bestehende Benutzer werden im nächsten Schritt
+                bearbeitbar.
             </div>
 
         </div>
@@ -66,6 +266,7 @@
             <div class="card-body p-0">
 
                 <div class="table-responsive">
+
                     <table class="table
                         table-hover
                         align-middle
@@ -130,6 +331,7 @@
                                     </td>
 
                                     <td>
+
                                         <div class="d-flex
                                             flex-wrap
                                             gap-1">
@@ -154,9 +356,11 @@
                                             }
 
                                         </div>
+
                                     </td>
 
                                     <td class="pe-4">
+
                                         @if (user.IsActive)
                                         {
                                             <span class="badge
@@ -171,6 +375,7 @@
                                                 Inaktiv
                                             </span>
                                         }
+
                                     </td>
 
                                 </tr>
@@ -179,15 +384,10 @@
                         </tbody>
 
                     </table>
+
                 </div>
 
             </div>
-        </div>
-
-        <div class="form-text mt-3">
-            Fehlende E-Mail-Adressen werden im nächsten
-            Ausbauschritt über die Benutzerverwaltung gepflegt.
-            Sie werden nicht aus Benutzer- oder Anzeigenamen abgeleitet.
         </div>
     }
 
@@ -197,23 +397,39 @@
     private IReadOnlyList<UserAdministrationItem> _users =
         Array.Empty<UserAdministrationItem>();
 
+    private IReadOnlyList<string> _availableRoles =
+        Array.Empty<string>();
+
+    private CreateUserFormModel _createModel =
+        new();
+
     private bool _isLoading =
         true;
 
-    private string? _errorMessage;
+    private bool _isCreating;
+
+    private string? _loadErrorMessage;
+
+    private string? _createErrorMessage;
+
+    private string? _createSuccessMessage;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            _users =
+            _availableRoles =
                 await UserAdministrationService
-                    .GetUsersAsync();
+                    .GetAvailableRolesAsync();
+
+            ResetCreateModel();
+
+            await LoadUsersAsync();
         }
         catch
         {
-            _errorMessage =
-                "Die Benutzer konnten nicht geladen werden.";
+            _loadErrorMessage =
+                "Die Benutzerverwaltung konnte nicht geladen werden.";
         }
         finally
         {
@@ -222,11 +438,186 @@
         }
     }
 
+    private async Task LoadUsersAsync()
+    {
+        _users =
+            await UserAdministrationService
+                .GetUsersAsync();
+    }
+
+    private async Task CreateUserAsync()
+    {
+        var selectedRoles =
+            _createModel.Roles
+                .Where(role =>
+                    role.IsSelected)
+                .Select(role =>
+                    role.RoleName)
+                .ToArray();
+
+        if (selectedRoles.Length == 0)
+        {
+            _createSuccessMessage =
+                null;
+
+            _createErrorMessage =
+                "Bitte mindestens eine Rolle auswählen.";
+
+            return;
+        }
+
+        _isCreating =
+            true;
+
+        _createErrorMessage =
+            null;
+
+        _createSuccessMessage =
+            null;
+
+        try
+        {
+            var request =
+                new CreateUserRequest(
+                    _createModel.UserName,
+                    _createModel.DisplayName,
+                    _createModel.Email,
+                    _createModel.Password,
+                    selectedRoles);
+
+            var result =
+                await UserAdministrationService
+                    .CreateUserAsync(
+                        request);
+
+            if (!result.Succeeded)
+            {
+                _createErrorMessage =
+                    string.Join(
+                        " ",
+                        result.Errors);
+
+                return;
+            }
+
+            var createdUserName =
+                _createModel.UserName.Trim();
+
+            await LoadUsersAsync();
+
+            ResetCreateModel();
+
+            _createSuccessMessage =
+                $"Benutzer '{createdUserName}' wurde angelegt.";
+        }
+        catch
+        {
+            _createErrorMessage =
+                "Der Benutzer konnte nicht angelegt werden.";
+        }
+        finally
+        {
+            _isCreating =
+                false;
+        }
+    }
+
+    private void ResetCreateModel()
+    {
+        _createModel =
+            new CreateUserFormModel
+            {
+                Roles =
+                    _availableRoles
+                        .Select(role =>
+                            new RoleSelectionModel
+                            {
+                                RoleName =
+                                    role
+                            })
+                        .ToList()
+            };
+    }
+
+    private static string GetRoleCheckboxId(
+        string roleName)
+    {
+        return
+            $"create-role-{roleName.ToLowerInvariant().Replace('_', '-')}";
+    }
+
     private static string GetUserCountText(
         int count)
     {
         return count == 1
             ? "Benutzerkonto"
             : "Benutzerkonten";
+    }
+
+    private sealed class CreateUserFormModel
+    {
+        [Required(
+            ErrorMessage =
+                "Bitte einen Anzeigenamen angeben.")]
+        [StringLength(
+            200,
+            ErrorMessage =
+                "Der Anzeigename darf maximal 200 Zeichen lang sein.")]
+        public string DisplayName { get; set; } =
+            string.Empty;
+
+        [Required(
+            ErrorMessage =
+                "Bitte einen Benutzernamen angeben.")]
+        [StringLength(
+            256,
+            ErrorMessage =
+                "Der Benutzername darf maximal 256 Zeichen lang sein.")]
+        public string UserName { get; set; } =
+            string.Empty;
+
+        [Required(
+            ErrorMessage =
+                "Bitte eine E-Mail-Adresse angeben.")]
+        [EmailAddress(
+            ErrorMessage =
+                "Bitte eine gültige E-Mail-Adresse angeben.")]
+        [StringLength(
+            256,
+            ErrorMessage =
+                "Die E-Mail-Adresse darf maximal 256 Zeichen lang sein.")]
+        public string Email { get; set; } =
+            string.Empty;
+
+        [Required(
+            ErrorMessage =
+                "Bitte ein Initialpasswort angeben.")]
+        [MinLength(
+            8,
+            ErrorMessage =
+                "Das Passwort muss mindestens 8 Zeichen lang sein.")]
+        public string Password { get; set; } =
+            string.Empty;
+
+        [Required(
+            ErrorMessage =
+                "Bitte das Initialpasswort bestätigen.")]
+        [Compare(
+            nameof(Password),
+            ErrorMessage =
+                "Die beiden Passwörter stimmen nicht überein.")]
+        public string ConfirmPassword { get; set; } =
+            string.Empty;
+
+        public List<RoleSelectionModel> Roles { get; set; } =
+            new();
+    }
+
+    private sealed class RoleSelectionModel
+    {
+        public string RoleName { get; set; } =
+            string.Empty;
+
+        public bool IsSelected { get; set; }
     }
 }
