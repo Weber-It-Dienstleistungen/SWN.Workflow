@@ -8,6 +8,9 @@ namespace Swn.Workflow.Infrastructure;
 public sealed class UserAdministrationService
     : IUserAdministrationService
 {
+    private const string UserAdministratorRole =
+        "USER_ADMIN";
+
     private readonly UserManager<ApplicationUser>
         _userManager;
 
@@ -122,16 +125,382 @@ public sealed class UserAdministrationService
             request.Password;
 
         var roles =
-            request.Roles
-                .Where(role =>
-                    !string.IsNullOrWhiteSpace(
-                        role))
-                .Select(role =>
-                    role.Trim())
-                .Distinct(
-                    StringComparer.OrdinalIgnoreCase)
+            NormalizeRoles(
+                request.Roles);
+
+        var validationErrors =
+            ValidateUserData(
+                userName,
+                displayName,
+                email,
+                roles);
+
+        if (string.IsNullOrWhiteSpace(
+            password))
+        {
+            validationErrors.Add(
+                "Bitte ein Initialpasswort angeben.");
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            return Failed(
+                validationErrors);
+        }
+
+        var existingUser =
+            await _userManager.FindByNameAsync(
+                userName);
+
+        if (existingUser is not null)
+        {
+            return Failed(
+                $"Der Benutzername '{userName}' ist bereits vergeben.");
+        }
+
+        var roleValidationResult =
+            await ValidateRolesAsync(
+                roles,
+                cancellationToken);
+
+        if (!roleValidationResult.Succeeded)
+        {
+            return roleValidationResult;
+        }
+
+        var user =
+            new ApplicationUser
+            {
+                UserName =
+                    userName,
+
+                DisplayName =
+                    displayName,
+
+                Email =
+                    email,
+
+                EmailConfirmed =
+                    true,
+
+                IsActive =
+                    true
+            };
+
+        var createResult =
+            await _userManager.CreateAsync(
+                user,
+                password);
+
+        if (!createResult.Succeeded)
+        {
+            return Failed(
+                GetErrors(
+                    createResult));
+        }
+
+        var roleResult =
+            await _userManager.AddToRolesAsync(
+                user,
+                roles);
+
+        if (!roleResult.Succeeded)
+        {
+            var errors =
+                GetErrors(
+                    roleResult)
+                .ToList();
+
+            var deleteResult =
+                await _userManager.DeleteAsync(
+                    user);
+
+            if (!deleteResult.Succeeded)
+            {
+                errors.Add(
+                    "Der unvollständig angelegte Benutzer konnte " +
+                    "nicht automatisch zurückgenommen werden.");
+
+                errors.AddRange(
+                    GetErrors(
+                        deleteResult));
+            }
+
+            return Failed(
+                errors);
+        }
+
+        return Succeeded();
+    }
+
+    public async Task<UserAdministrationOperationResult>
+        UpdateUserAsync(
+            UpdateUserRequest request,
+            string actingUserId,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(
+            request);
+
+        cancellationToken
+            .ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(
+            request.UserId))
+        {
+            return Failed(
+                "Der zu bearbeitende Benutzer wurde nicht angegeben.");
+        }
+
+        if (string.IsNullOrWhiteSpace(
+            actingUserId))
+        {
+            return Failed(
+                "Der angemeldete Administrator konnte nicht ermittelt werden.");
+        }
+
+        var user =
+            await _userManager.FindByIdAsync(
+                request.UserId);
+
+        if (user is null)
+        {
+            return Failed(
+                "Der Benutzer wurde nicht gefunden.");
+        }
+
+        var userName =
+            request.UserName.Trim();
+
+        var displayName =
+            request.DisplayName.Trim();
+
+        var email =
+            request.Email.Trim();
+
+        var roles =
+            NormalizeRoles(
+                request.Roles);
+
+        var validationErrors =
+            ValidateUserData(
+                userName,
+                displayName,
+                email,
+                roles);
+
+        if (validationErrors.Count > 0)
+        {
+            return Failed(
+                validationErrors);
+        }
+
+        var userWithSameName =
+            await _userManager.FindByNameAsync(
+                userName);
+
+        if (userWithSameName is not null &&
+            !string.Equals(
+                userWithSameName.Id,
+                user.Id,
+                StringComparison.Ordinal))
+        {
+            return Failed(
+                $"Der Benutzername '{userName}' ist bereits vergeben.");
+        }
+
+        var roleValidationResult =
+            await ValidateRolesAsync(
+                roles,
+                cancellationToken);
+
+        if (!roleValidationResult.Succeeded)
+        {
+            return roleValidationResult;
+        }
+
+        if (string.Equals(
+                user.Id,
+                actingUserId,
+                StringComparison.Ordinal) &&
+            !request.IsActive)
+        {
+            return Failed(
+                "Das eigene Benutzerkonto kann nicht deaktiviert werden.");
+        }
+
+        var existingRoles =
+            await _userManager.GetRolesAsync(
+                user);
+
+        var currentlyIsAdministrator =
+            existingRoles.Contains(
+                UserAdministratorRole,
+                StringComparer.OrdinalIgnoreCase);
+
+        var remainsAdministrator =
+            roles.Contains(
+                UserAdministratorRole,
+                StringComparer.OrdinalIgnoreCase);
+
+        if (currentlyIsAdministrator &&
+            (!request.IsActive ||
+             !remainsAdministrator))
+        {
+            var otherActiveAdministrators =
+                await GetOtherActiveAdministratorsAsync(
+                    user.Id);
+
+            if (otherActiveAdministrators == 0)
+            {
+                return Failed(
+                    "Der letzte aktive Benutzeradministrator kann " +
+                    "weder deaktiviert noch seiner Rolle USER_ADMIN " +
+                    "beraubt werden.");
+            }
+        }
+
+        user.UserName =
+            userName;
+
+        user.DisplayName =
+            displayName;
+
+        user.Email =
+            email;
+
+        user.EmailConfirmed =
+            true;
+
+        user.IsActive =
+            request.IsActive;
+
+        var updateResult =
+            await _userManager.UpdateAsync(
+                user);
+
+        if (!updateResult.Succeeded)
+        {
+            return Failed(
+                GetErrors(
+                    updateResult));
+        }
+
+        var rolesToRemove =
+            existingRoles
+                .Where(existingRole =>
+                    !roles.Contains(
+                        existingRole,
+                        StringComparer.OrdinalIgnoreCase))
                 .ToArray();
 
+        if (rolesToRemove.Length > 0)
+        {
+            var removeResult =
+                await _userManager.RemoveFromRolesAsync(
+                    user,
+                    rolesToRemove);
+
+            if (!removeResult.Succeeded)
+            {
+                return Failed(
+                    GetErrors(
+                        removeResult));
+            }
+        }
+
+        var rolesAfterRemoval =
+            await _userManager.GetRolesAsync(
+                user);
+
+        var rolesToAdd =
+            roles
+                .Where(role =>
+                    !rolesAfterRemoval.Contains(
+                        role,
+                        StringComparer.OrdinalIgnoreCase))
+                .ToArray();
+
+        if (rolesToAdd.Length > 0)
+        {
+            var addResult =
+                await _userManager.AddToRolesAsync(
+                    user,
+                    rolesToAdd);
+
+            if (!addResult.Succeeded)
+            {
+                return Failed(
+                    GetErrors(
+                        addResult));
+            }
+        }
+
+        return Succeeded();
+    }
+
+    private async Task<int>
+        GetOtherActiveAdministratorsAsync(
+            string excludedUserId)
+    {
+        var administrators =
+            await _userManager.GetUsersInRoleAsync(
+                UserAdministratorRole);
+
+        return administrators.Count(user =>
+            user.IsActive &&
+            !string.Equals(
+                user.Id,
+                excludedUserId,
+                StringComparison.Ordinal));
+    }
+
+    private async Task<UserAdministrationOperationResult>
+        ValidateRolesAsync(
+            IReadOnlyCollection<string> roles,
+            CancellationToken cancellationToken)
+    {
+        var availableRoles =
+            await GetAvailableRolesAsync(
+                cancellationToken);
+
+        var invalidRoles =
+            roles
+                .Where(role =>
+                    !availableRoles.Contains(
+                        role,
+                        StringComparer.OrdinalIgnoreCase))
+                .ToArray();
+
+        if (invalidRoles.Length > 0)
+        {
+            return Failed(
+                "Mindestens eine ausgewählte Rolle ist nicht vorhanden.");
+        }
+
+        return Succeeded();
+    }
+
+    private static string[] NormalizeRoles(
+        IEnumerable<string> roles)
+    {
+        return roles
+            .Where(role =>
+                !string.IsNullOrWhiteSpace(
+                    role))
+            .Select(role =>
+                role.Trim())
+            .Distinct(
+                StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static List<string> ValidateUserData(
+        string userName,
+        string displayName,
+        string email,
+        IReadOnlyCollection<string> roles)
+    {
         var validationErrors =
             new List<string>();
 
@@ -168,129 +537,38 @@ public sealed class UserAdministrationService
             }
         }
 
-        if (string.IsNullOrWhiteSpace(
-            password))
-        {
-            validationErrors.Add(
-                "Bitte ein Initialpasswort angeben.");
-        }
-
-        if (roles.Length == 0)
+        if (roles.Count == 0)
         {
             validationErrors.Add(
                 "Bitte mindestens eine Rolle auswählen.");
         }
 
-        if (validationErrors.Count > 0)
-        {
-            return new UserAdministrationOperationResult(
-                false,
-                validationErrors);
-        }
+        return validationErrors;
+    }
 
-        var existingUser =
-            await _userManager.FindByNameAsync(
-                userName);
-
-        if (existingUser is not null)
-        {
-            return new UserAdministrationOperationResult(
-                false,
-                new[]
-                {
-                    $"Der Benutzername '{userName}' ist bereits vergeben."
-                });
-        }
-
-        var availableRoles =
-            await GetAvailableRolesAsync(
-                cancellationToken);
-
-        var invalidRoles =
-            roles
-                .Where(role =>
-                    !availableRoles.Contains(
-                        role,
-                        StringComparer.OrdinalIgnoreCase))
-                .ToArray();
-
-        if (invalidRoles.Length > 0)
-        {
-            return new UserAdministrationOperationResult(
-                false,
-                new[]
-                {
-                    "Mindestens eine ausgewählte Rolle ist nicht vorhanden."
-                });
-        }
-
-        var user =
-            new ApplicationUser
-            {
-                UserName =
-                    userName,
-
-                DisplayName =
-                    displayName,
-
-                Email =
-                    email,
-
-                EmailConfirmed =
-                    true,
-
-                IsActive =
-                    true
-            };
-
-        var createResult =
-            await _userManager.CreateAsync(
-                user,
-                password);
-
-        if (!createResult.Succeeded)
-        {
-            return new UserAdministrationOperationResult(
-                false,
-                GetErrors(
-                    createResult));
-        }
-
-        var roleResult =
-            await _userManager.AddToRolesAsync(
-                user,
-                roles);
-
-        if (!roleResult.Succeeded)
-        {
-            var errors =
-                GetErrors(
-                    roleResult)
-                .ToList();
-
-            var deleteResult =
-                await _userManager.DeleteAsync(
-                    user);
-
-            if (!deleteResult.Succeeded)
-            {
-                errors.Add(
-                    "Der unvollständig angelegte Benutzer konnte " +
-                    "nicht automatisch zurückgenommen werden.");
-
-                errors.AddRange(
-                    GetErrors(
-                        deleteResult));
-            }
-
-            return new UserAdministrationOperationResult(
-                false,
-                errors);
-        }
-
+    private static UserAdministrationOperationResult Succeeded()
+    {
         return new UserAdministrationOperationResult(
             true,
             Array.Empty<string>());
+    }
+
+    private static UserAdministrationOperationResult Failed(
+        string error)
+    {
+        return Failed(
+            new[]
+            {
+                error
+            });
+    }
+
+    private static UserAdministrationOperationResult Failed(
+        IReadOnlyList<string> errors)
+    {
+        return new UserAdministrationOperationResult(
+            false,
+            errors);
     }
 
     private static IReadOnlyList<string> GetErrors(

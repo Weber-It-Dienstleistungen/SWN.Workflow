@@ -1,12 +1,15 @@
 ﻿@page "/admin/users"
 
 @using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Swn.Workflow.Application
 
 @attribute [Authorize(Roles = "USER_ADMIN")]
 
 @inject IUserAdministrationService UserAdministrationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Benutzerverwaltung</PageTitle>
 
@@ -199,12 +202,12 @@
                                     <div class="form-check border rounded p-3">
 
                                         <InputCheckbox
-                                            id="@GetRoleCheckboxId(role.RoleName)"
+                                            id="@GetCreateRoleCheckboxId(role.RoleName)"
                                             class="form-check-input ms-0 me-2"
                                             @bind-Value="role.IsSelected" />
 
                                         <label class="form-check-label"
-                                               for="@GetRoleCheckboxId(role.RoleName)">
+                                               for="@GetCreateRoleCheckboxId(role.RoleName)">
                                             @role.RoleName
                                         </label>
 
@@ -241,6 +244,205 @@
             </div>
         </div>
 
+        @if (_editModel is not null)
+        {
+            <div class="card shadow-sm mb-4">
+
+                <div class="card-header
+                    bg-body
+                    fw-semibold
+                    d-flex
+                    justify-content-between
+                    align-items-center">
+
+                    <span>
+                        Benutzer bearbeiten
+                    </span>
+
+                    <button class="btn btn-sm btn-outline-secondary"
+                            type="button"
+                            @onclick="CancelEdit">
+                        Schließen
+                    </button>
+
+                </div>
+
+                <div class="card-body">
+
+                    @if (!string.IsNullOrWhiteSpace(
+                        _editErrorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            @_editErrorMessage
+                        </div>
+                    }
+
+                    <EditForm Model="_editModel"
+                              OnValidSubmit="UpdateUserAsync">
+
+                        <DataAnnotationsValidator />
+
+                        <ValidationSummary />
+
+                        <div class="row">
+
+                            <div class="col-lg-6 mb-3">
+
+                                <label class="form-label"
+                                       for="editDisplayName">
+                                    Anzeigename
+                                </label>
+
+                                <InputText id="editDisplayName"
+                                           class="form-control"
+                                           @bind-Value="_editModel.DisplayName" />
+
+                                <ValidationMessage
+                                    For="@(() => _editModel.DisplayName)" />
+
+                            </div>
+
+                            <div class="col-lg-6 mb-3">
+
+                                <label class="form-label"
+                                       for="editUserName">
+                                    Benutzername
+                                </label>
+
+                                <InputText id="editUserName"
+                                           class="form-control"
+                                           autocomplete="off"
+                                           @bind-Value="_editModel.UserName" />
+
+                                <ValidationMessage
+                                    For="@(() => _editModel.UserName)" />
+
+                            </div>
+
+                        </div>
+
+                        <div class="mb-3">
+
+                            <label class="form-label"
+                                   for="editEmail">
+                                E-Mail-Adresse
+                            </label>
+
+                            <InputText id="editEmail"
+                                       class="form-control"
+                                       type="email"
+                                       autocomplete="off"
+                                       @bind-Value="_editModel.Email" />
+
+                            <ValidationMessage
+                                For="@(() => _editModel.Email)" />
+
+                        </div>
+
+                        <div class="mb-4">
+
+                            <div class="form-check">
+
+                                <InputCheckbox id="editIsActive"
+                                               class="form-check-input"
+                                               disabled="@IsEditingOwnAccount"
+                                               @bind-Value="_editModel.IsActive" />
+
+                                <label class="form-check-label"
+                                       for="editIsActive">
+                                    Benutzerkonto aktiv
+                                </label>
+
+                            </div>
+
+                            @if (IsEditingOwnAccount)
+                            {
+                                <div class="form-text">
+                                    Das aktuell verwendete eigene
+                                    Benutzerkonto kann nicht deaktiviert werden.
+                                </div>
+                            }
+
+                        </div>
+
+                        <div class="mb-4">
+
+                            <label class="form-label">
+                                Rollen
+                            </label>
+
+                            <div class="row row-cols-1 row-cols-md-2 g-2">
+
+                                @foreach (var role in _editModel.Roles)
+                                {
+                                    <div class="col"
+                                         @key="role.RoleName">
+
+                                        <div class="form-check border rounded p-3">
+
+                                            <InputCheckbox
+                                                id="@GetEditRoleCheckboxId(role.RoleName)"
+                                                class="form-check-input ms-0 me-2"
+                                                @bind-Value="role.IsSelected" />
+
+                                            <label class="form-check-label"
+                                                   for="@GetEditRoleCheckboxId(role.RoleName)">
+                                                @role.RoleName
+                                            </label>
+
+                                        </div>
+
+                                    </div>
+                                }
+
+                            </div>
+
+                        </div>
+
+                        <div class="d-flex gap-2">
+
+                            <button class="btn btn-primary"
+                                    type="submit"
+                                    disabled="@_isUpdating">
+
+                                @if (_isUpdating)
+                                {
+                                    <span>
+                                        Änderungen werden gespeichert...
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span>
+                                        Änderungen speichern
+                                    </span>
+                                }
+
+                            </button>
+
+                            <button class="btn btn-outline-secondary"
+                                    type="button"
+                                    disabled="@_isUpdating"
+                                    @onclick="CancelEdit">
+                                Abbrechen
+                            </button>
+
+                        </div>
+
+                    </EditForm>
+
+                </div>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(
+            _updateSuccessMessage))
+        {
+            <div class="alert alert-success">
+                @_updateSuccessMessage
+            </div>
+        }
+
         <div class="d-flex
             flex-column
             flex-md-row
@@ -256,8 +458,8 @@
             </div>
 
             <div class="small text-secondary">
-                Bestehende Benutzer werden im nächsten Schritt
-                bearbeitbar.
+                Benutzer werden deaktiviert statt gelöscht,
+                damit historische Zuordnungen erhalten bleiben.
             </div>
 
         </div>
@@ -290,8 +492,12 @@
                                     Rollen
                                 </th>
 
-                                <th class="pe-4">
+                                <th>
                                     Status
+                                </th>
+
+                                <th class="pe-4 text-end">
+                                    Aktion
                                 </th>
                             </tr>
                         </thead>
@@ -359,7 +565,7 @@
 
                                     </td>
 
-                                    <td class="pe-4">
+                                    <td>
 
                                         @if (user.IsActive)
                                         {
@@ -375,6 +581,18 @@
                                                 Inaktiv
                                             </span>
                                         }
+
+                                    </td>
+
+                                    <td class="pe-4 text-end">
+
+                                        <button class="btn
+                                            btn-sm
+                                            btn-outline-primary"
+                                                type="button"
+                                                @onclick="() => BeginEdit(user)">
+                                            Bearbeiten
+                                        </button>
 
                                     </td>
 
@@ -403,10 +621,17 @@
     private CreateUserFormModel _createModel =
         new();
 
+    private EditUserFormModel? _editModel;
+
+    private string _currentUserId =
+        string.Empty;
+
     private bool _isLoading =
         true;
 
     private bool _isCreating;
+
+    private bool _isUpdating;
 
     private string? _loadErrorMessage;
 
@@ -414,10 +639,39 @@
 
     private string? _createSuccessMessage;
 
+    private string? _editErrorMessage;
+
+    private string? _updateSuccessMessage;
+
+    private bool IsEditingOwnAccount =>
+        _editModel is not null &&
+        string.Equals(
+            _editModel.UserId,
+            _currentUserId,
+            StringComparison.Ordinal);
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
+            var authenticationState =
+                await AuthenticationStateProvider
+                    .GetAuthenticationStateAsync();
+
+            _currentUserId =
+                authenticationState.User
+                    .FindFirst(
+                        ClaimTypes.NameIdentifier)?
+                    .Value ??
+                string.Empty;
+
+            if (string.IsNullOrWhiteSpace(
+                _currentUserId))
+            {
+                throw new InvalidOperationException(
+                    "Der angemeldete Benutzer konnte nicht ermittelt werden.");
+            }
+
             _availableRoles =
                 await UserAdministrationService
                     .GetAvailableRolesAsync();
@@ -522,6 +776,142 @@
         }
     }
 
+    private void BeginEdit(
+        UserAdministrationItem user)
+    {
+        _editErrorMessage =
+            null;
+
+        _updateSuccessMessage =
+            null;
+
+        _editModel =
+            new EditUserFormModel
+            {
+                UserId =
+                    user.Id,
+
+                UserName =
+                    user.UserName,
+
+                DisplayName =
+                    user.DisplayName,
+
+                Email =
+                    user.Email ??
+                    string.Empty,
+
+                IsActive =
+                    user.IsActive,
+
+                Roles =
+                    _availableRoles
+                        .Select(role =>
+                            new RoleSelectionModel
+                            {
+                                RoleName =
+                                    role,
+
+                                IsSelected =
+                                    user.Roles.Contains(
+                                        role,
+                                        StringComparer.OrdinalIgnoreCase)
+                            })
+                        .ToList()
+            };
+    }
+
+    private void CancelEdit()
+    {
+        _editModel =
+            null;
+
+        _editErrorMessage =
+            null;
+    }
+
+    private async Task UpdateUserAsync()
+    {
+        if (_editModel is null)
+        {
+            return;
+        }
+
+        var selectedRoles =
+            _editModel.Roles
+                .Where(role =>
+                    role.IsSelected)
+                .Select(role =>
+                    role.RoleName)
+                .ToArray();
+
+        if (selectedRoles.Length == 0)
+        {
+            _editErrorMessage =
+                "Bitte mindestens eine Rolle auswählen.";
+
+            return;
+        }
+
+        _isUpdating =
+            true;
+
+        _editErrorMessage =
+            null;
+
+        _updateSuccessMessage =
+            null;
+
+        try
+        {
+            var request =
+                new UpdateUserRequest(
+                    _editModel.UserId,
+                    _editModel.UserName,
+                    _editModel.DisplayName,
+                    _editModel.Email,
+                    _editModel.IsActive,
+                    selectedRoles);
+
+            var result =
+                await UserAdministrationService
+                    .UpdateUserAsync(
+                        request,
+                        _currentUserId);
+
+            if (!result.Succeeded)
+            {
+                _editErrorMessage =
+                    string.Join(
+                        " ",
+                        result.Errors);
+
+                return;
+            }
+
+            var updatedUserName =
+                _editModel.UserName.Trim();
+
+            await LoadUsersAsync();
+
+            _editModel =
+                null;
+
+            _updateSuccessMessage =
+                $"Benutzer '{updatedUserName}' wurde aktualisiert.";
+        }
+        catch
+        {
+            _editErrorMessage =
+                "Der Benutzer konnte nicht aktualisiert werden.";
+        }
+        finally
+        {
+            _isUpdating =
+                false;
+        }
+    }
+
     private void ResetCreateModel()
     {
         _createModel =
@@ -539,11 +929,18 @@
             };
     }
 
-    private static string GetRoleCheckboxId(
+    private static string GetCreateRoleCheckboxId(
         string roleName)
     {
         return
             $"create-role-{roleName.ToLowerInvariant().Replace('_', '-')}";
+    }
+
+    private static string GetEditRoleCheckboxId(
+        string roleName)
+    {
+        return
+            $"edit-role-{roleName.ToLowerInvariant().Replace('_', '-')}";
     }
 
     private static string GetUserCountText(
@@ -608,6 +1005,50 @@
                 "Die beiden Passwörter stimmen nicht überein.")]
         public string ConfirmPassword { get; set; } =
             string.Empty;
+
+        public List<RoleSelectionModel> Roles { get; set; } =
+            new();
+    }
+
+    private sealed class EditUserFormModel
+    {
+        public string UserId { get; set; } =
+            string.Empty;
+
+        [Required(
+            ErrorMessage =
+                "Bitte einen Anzeigenamen angeben.")]
+        [StringLength(
+            200,
+            ErrorMessage =
+                "Der Anzeigename darf maximal 200 Zeichen lang sein.")]
+        public string DisplayName { get; set; } =
+            string.Empty;
+
+        [Required(
+            ErrorMessage =
+                "Bitte einen Benutzernamen angeben.")]
+        [StringLength(
+            256,
+            ErrorMessage =
+                "Der Benutzername darf maximal 256 Zeichen lang sein.")]
+        public string UserName { get; set; } =
+            string.Empty;
+
+        [Required(
+            ErrorMessage =
+                "Bitte eine E-Mail-Adresse angeben.")]
+        [EmailAddress(
+            ErrorMessage =
+                "Bitte eine gültige E-Mail-Adresse angeben.")]
+        [StringLength(
+            256,
+            ErrorMessage =
+                "Die E-Mail-Adresse darf maximal 256 Zeichen lang sein.")]
+        public string Email { get; set; } =
+            string.Empty;
+
+        public bool IsActive { get; set; }
 
         public List<RoleSelectionModel> Roles { get; set; } =
             new();

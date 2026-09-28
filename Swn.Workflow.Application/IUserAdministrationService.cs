@@ -11,4 +11,9 @@ public interface IUserAdministrationService
     Task<UserAdministrationOperationResult> CreateUserAsync(
         CreateUserRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<UserAdministrationOperationResult> UpdateUserAsync(
+        UpdateUserRequest request,
+        string actingUserId,
+        CancellationToken cancellationToken = default);
 }
