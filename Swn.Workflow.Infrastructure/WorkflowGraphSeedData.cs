@@ -57,37 +57,37 @@ public static class WorkflowGraphSeedData
         ConfigureExistingDecisionTask(
             tasks,
             "ONB-001",
-            1);
+            LaufzettelSortOrder(1));
 
         ConfigureExistingDecisionTask(
             tasks,
             "ONB-002",
-            2);
+            LaufzettelSortOrder(2));
 
         ConfigureExistingDecisionTask(
             tasks,
             "ONB-003",
-            3);
+            LaufzettelSortOrder(3));
 
         ConfigureExistingDecisionTask(
             tasks,
             "ONB-004",
-            4);
+            LaufzettelSortOrder(4));
 
         ConfigureExistingDecisionTask(
             tasks,
             "ONB-005",
-            5);
+            LaufzettelSortOrder(5));
 
         ConfigureExistingDecisionTask(
             tasks,
             "ONB-006",
-            6);
+            LaufzettelSortOrder(6));
 
         ConfigureExistingDecisionTask(
             tasks,
             "ONB-007",
-            7);
+            LaufzettelSortOrder(7));
 
         AddOrUpdateTaskDefinition(
             db,
@@ -97,7 +97,7 @@ public static class WorkflowGraphSeedData
             "Bedarf an Rechnerzugang klären",
             "Festlegen, ob für den Mitarbeiter ein Rechnerzugang eingerichtet werden muss.",
             "Vorbereitung vor Eintritt",
-            8,
+            LaufzettelSortOrder(8),
             "SUPERVISOR",
             false,
             TaskType.Decision);
@@ -110,7 +110,7 @@ public static class WorkflowGraphSeedData
             "Bedarf an PC-Arbeitsplatz klären",
             "Festlegen, ob ein stationärer PC-Arbeitsplatz benötigt wird.",
             "Vorbereitung vor Eintritt",
-            9,
+            LaufzettelSortOrder(10),
             "SUPERVISOR",
             false,
             TaskType.Decision);
@@ -123,7 +123,7 @@ public static class WorkflowGraphSeedData
             "Bedarf an mobilem PC-System klären",
             "Festlegen, ob ein mobiles PC-System benötigt wird.",
             "Vorbereitung vor Eintritt",
-            10,
+            LaufzettelSortOrder(11),
             "SUPERVISOR",
             false,
             TaskType.Decision);
@@ -136,7 +136,7 @@ public static class WorkflowGraphSeedData
             "Bedarf an Leitsystem-Berechtigung klären",
             "Festlegen, ob eine Benutzerberechtigung für das Leitsystem benötigt wird.",
             "Vorbereitung vor Eintritt",
-            11,
+            LaufzettelSortOrder(12),
             "SUPERVISOR",
             false,
             TaskType.Decision);
@@ -149,7 +149,7 @@ public static class WorkflowGraphSeedData
             "Bedarf an E-Mail-Account klären",
             "Festlegen, ob für den Mitarbeiter ein E-Mail-Account eingerichtet werden muss.",
             "Vorbereitung vor Eintritt",
-            12,
+            LaufzettelSortOrder(13),
             "SUPERVISOR",
             false,
             TaskType.Decision);
@@ -162,7 +162,7 @@ public static class WorkflowGraphSeedData
             "Bedarf an Schleupen-Zugang klären",
             "Festlegen, ob ein Schleupen-Zugang benötigt wird.",
             "Vorbereitung vor Eintritt",
-            13,
+            LaufzettelSortOrder(14),
             "SUPERVISOR",
             false,
             TaskType.Decision);
@@ -175,7 +175,7 @@ public static class WorkflowGraphSeedData
             "Bedarf an Arbeitsplatztelefon klären",
             "Festlegen, ob ein Arbeitsplatztelefon benötigt wird.",
             "Vorbereitung vor Eintritt",
-            14,
+            LaufzettelSortOrder(15),
             "SUPERVISOR",
             false,
             TaskType.Decision);
@@ -188,7 +188,7 @@ public static class WorkflowGraphSeedData
             "Bedarf an Mobiltelefon klären",
             "Festlegen, ob ein Mobiltelefon benötigt wird.",
             "Vorbereitung vor Eintritt",
-            15,
+            LaufzettelSortOrder(16),
             "SUPERVISOR",
             false,
             TaskType.Decision);
@@ -201,7 +201,7 @@ public static class WorkflowGraphSeedData
             "Bedarf an Zeiterfassungs-Transponder klären",
             "Festlegen, ob ein Transponder zur Zeiterfassung benötigt wird.",
             "Vorbereitung vor Eintritt",
-            16,
+            LaufzettelSortOrder(19),
             "SUPERVISOR",
             false,
             TaskType.Decision);
@@ -214,7 +214,7 @@ public static class WorkflowGraphSeedData
             "Bedarf an Alarmanlagen-Transponder klären",
             "Festlegen, ob ein Transponder zur Bedienung der Alarmanlage im Hallenbad benötigt wird.",
             "Vorbereitung vor Eintritt",
-            17,
+            LaufzettelSortOrder(22),
             "SUPERVISOR",
             false,
             TaskType.Decision);
@@ -227,7 +227,7 @@ public static class WorkflowGraphSeedData
             "Bedarf an Informationssicherheits-Schulung klären",
             "Festlegen, ob die Schulung zur Informationssicherheit durchgeführt werden muss.",
             "Vorbereitung vor Eintritt",
-            18,
+            LaufzettelSortOrder(25),
             "SUPERVISOR",
             false,
             TaskType.Decision);
@@ -240,7 +240,7 @@ public static class WorkflowGraphSeedData
             "Zusätzliche Software und Zugänge bereitstellen",
             "Die vom Vorgesetzten festgelegte zusätzliche Software beziehungsweise zusätzliche Zugänge bereitstellen. Falls vorhandene Lizenzen nicht ausreichen, ist die Beschaffung zu klären.",
             "Vorbereitung vor Eintritt",
-            102,
+            LaufzettelSortOrder(2, 1),
             "IT",
             true,
             TaskType.Work);
@@ -253,7 +253,7 @@ public static class WorkflowGraphSeedData
             "Zusätzliche Ausstattung bereitstellen",
             "Die vom Vorgesetzten festgelegte zusätzliche Ausstattung für den Arbeitsplatz bereitstellen beziehungsweise die Beschaffung veranlassen.",
             "Vorbereitung vor Eintritt",
-            103,
+            LaufzettelSortOrder(3, 1),
             "WAREHOUSE",
             true,
             TaskType.Work);
@@ -261,92 +261,92 @@ public static class WorkflowGraphSeedData
         ConfigureExistingWorkTask(
             tasks,
             "ONB-008",
-            108);
+            LaufzettelSortOrder(8, 1));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-009",
-            109);
+            LaufzettelSortOrder(9));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-010",
-            110);
+            LaufzettelSortOrder(10, 1));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-011",
-            111);
+            LaufzettelSortOrder(11, 1));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-012",
-            112);
+            LaufzettelSortOrder(12, 1));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-013",
-            113);
+            LaufzettelSortOrder(13, 1));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-014",
-            114);
+            LaufzettelSortOrder(14, 1));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-015",
-            115);
+            LaufzettelSortOrder(15, 1));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-016",
-            116);
+            LaufzettelSortOrder(16, 1));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-017",
-            117);
+            LaufzettelSortOrder(17));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-018",
-            118);
+            LaufzettelSortOrder(18));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-019",
-            119);
+            LaufzettelSortOrder(19, 1));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-020",
-            120);
+            LaufzettelSortOrder(20));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-021",
-            121);
+            LaufzettelSortOrder(21));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-022",
-            122);
+            LaufzettelSortOrder(22, 1));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-023",
-            123);
+            LaufzettelSortOrder(23));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-024",
-            124);
+            LaufzettelSortOrder(24));
 
         ConfigureExistingWorkTask(
             tasks,
             "ONB-025",
-            125);
+            LaufzettelSortOrder(25, 1));
 
         var branches =
             new[]
@@ -463,67 +463,67 @@ public static class WorkflowGraphSeedData
         ConfigureExistingDecisionTask(
             tasks,
             "OFF-002",
-            1);
+            LaufzettelSortOrder(2));
 
         ConfigureExistingDecisionTask(
             tasks,
             "OFF-003",
-            2);
+            LaufzettelSortOrder(3));
 
         ConfigureExistingDecisionTask(
             tasks,
             "OFF-004",
-            3);
+            LaufzettelSortOrder(4));
 
         ConfigureExistingDecisionTask(
             tasks,
             "OFF-005",
-            4);
+            LaufzettelSortOrder(5));
 
         ConfigureExistingDecisionTask(
             tasks,
             "OFF-007",
-            5);
+            LaufzettelSortOrder(7));
 
         ConfigureExistingWorkTask(
             tasks,
             "OFF-008",
-            108);
+            LaufzettelSortOrder(8));
 
         ConfigureExistingWorkTask(
             tasks,
             "OFF-010",
-            110);
+            LaufzettelSortOrder(10));
 
         ConfigureExistingWorkTask(
             tasks,
             "OFF-011",
-            111);
+            LaufzettelSortOrder(11));
 
         ConfigureExistingWorkTask(
             tasks,
             "OFF-012",
-            112);
+            LaufzettelSortOrder(12));
 
         ConfigureExistingWorkTask(
             tasks,
             "OFF-013",
-            113);
+            LaufzettelSortOrder(13));
 
         ConfigureExistingWorkTask(
             tasks,
             "OFF-014",
-            114);
+            LaufzettelSortOrder(14));
 
         ConfigureExistingWorkTask(
             tasks,
             "OFF-016",
-            116);
+            LaufzettelSortOrder(16));
 
         ConfigureExistingWorkTask(
             tasks,
             "OFF-018",
-            118);
+            LaufzettelSortOrder(18));
 
         var branches =
             new[]
@@ -625,6 +625,15 @@ public static class WorkflowGraphSeedData
 
         task.SortOrder =
             sortOrder;
+    }
+
+    private static int LaufzettelSortOrder(
+        int position,
+        int subOrder = 0)
+    {
+        return
+            position * 10 +
+            subOrder;
     }
 
     private static TaskDefinition AddOrUpdateTaskDefinition(
