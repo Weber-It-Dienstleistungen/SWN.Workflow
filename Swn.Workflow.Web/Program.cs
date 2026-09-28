@@ -74,6 +74,7 @@ app.MapPost(
     "/account/login",
     async (
         HttpContext httpContext,
+        UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         IAntiforgery antiforgery) =>
     {
@@ -94,9 +95,19 @@ app.MapPost(
             return Results.Redirect("/login");
         }
 
+        var user =
+            await userManager.FindByNameAsync(
+                userName);
+
+        if (user is null ||
+            !user.IsActive)
+        {
+            return Results.Redirect("/login");
+        }
+
         var result =
             await signInManager.PasswordSignInAsync(
-                userName,
+                user,
                 password,
                 isPersistent: false,
                 lockoutOnFailure: false);

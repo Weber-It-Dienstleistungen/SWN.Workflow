@@ -24,7 +24,8 @@ public static class IdentitySeedData
             "TECHNICAL_MANAGEMENT",
             "WAREHOUSE",
             "INFORMATION_SECURITY",
-            "CONTROL_SYSTEM"
+            "CONTROL_SYSTEM",
+            "USER_ADMIN"
         };
 
         foreach (var roleName in roles)
@@ -67,7 +68,8 @@ public static class IdentitySeedData
                 "Prozess- und Projektsteuerung",
                 new[]
                 {
-                    "ORGANIZATION"
+                    "ORGANIZATION",
+                    "USER_ADMIN"
                 }),
 
             new UserSeedDefinition(
@@ -254,6 +256,9 @@ public static class IdentitySeedData
 
                 DisplayName =
                     definition.DisplayName,
+
+                IsActive =
+                    true,
 
                 EmailConfirmed =
                     true

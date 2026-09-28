@@ -58,6 +58,10 @@ public class WorkflowDbContext
             entity.Property(x => x.DisplayName)
                 .IsRequired()
                 .HasMaxLength(200);
+
+            entity.Property(x => x.IsActive)
+                .IsRequired()
+                .HasDefaultValue(true);
         });
 
         modelBuilder.Entity<WorkflowDefinition>(entity =>

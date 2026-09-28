@@ -43,6 +43,8 @@ public sealed class UserDirectoryService
         cancellationToken.ThrowIfCancellationRequested();
 
         return users
+            .Where(user =>
+                user.IsActive)
             .Select(user =>
                 new AssignableUserItem(
                     user.Id,
