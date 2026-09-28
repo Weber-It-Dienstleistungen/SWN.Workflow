@@ -25,7 +25,8 @@
         </h1>
 
         <p class="text-secondary mb-0">
-            Hier bearbeitest du alle Aufgaben,
+            Wähle zunächst einen laufenden Vorgang aus.
+            Anschließend siehst du nur die Aufgaben dieses Vorgangs,
             die dir direkt oder über deine Rollen zugewiesen sind.
         </p>
     </div>
@@ -57,86 +58,45 @@
             </div>
         </div>
     }
-    else
+    else if (_selectedWorkflowInstanceId is null)
     {
+        var workflowGroups = GetWorkflowGroups();
+
         <div class="mb-3 text-secondary">
-            @_tasks.Count offene
+            @workflowGroups.Count
+            @GetWorkflowCountText(workflowGroups.Count)
+            mit insgesamt
+            @_tasks.Count offenen
             @GetTaskCountText(_tasks.Count)
         </div>
 
         <div class="d-flex flex-column gap-3">
 
-            @foreach (var task in _tasks)
+            @foreach (var workflow in workflowGroups)
             {
-                <div @key="task.Id"
+                <div @key="workflow.WorkflowInstanceId"
                      class="card shadow-sm">
 
                     <div class="card-body p-4">
 
                         <div class="d-flex
                             flex-column
-                            flex-xl-row
+                            flex-lg-row
                             justify-content-between
+                            align-items-lg-center
                             gap-4">
 
                             <div class="flex-grow-1">
 
-                                <div class="d-flex
-                                    flex-wrap
-                                    align-items-center
-                                    gap-2
-                                    mb-2">
-
-                                    <span class="badge text-bg-light border">
-                                        @task.AssignedRoleKey
-                                    </span>
-
-                                    <span class="badge
-                                        @GetStatusBadgeClass(
-                                            task.Status)">
-                                        @GetStatusText(
-                                            task.Status)
-                                    </span>
-
+                                <div class="text-secondary small mb-1">
+                                    @workflow.WorkflowName
                                 </div>
 
-                                <h2 class="h5 mb-1">
-                                    @task.Title
+                                <h2 class="h5 mb-3">
+                                    @workflow.Subject
                                 </h2>
 
-                                <div class="text-secondary mb-3">
-                                    @task.WorkflowName
-                                </div>
-
-                                @if (!string.IsNullOrWhiteSpace(
-                                    task.Description))
-                                {
-                                    <p class="mb-4">
-                                        @task.Description
-                                    </p>
-                                }
-
-                                <div class="row g-3 small mb-4">
-
-                                    <div class="col-md-4">
-                                        <span class="text-secondary">
-                                            Mitarbeiter / Betreff
-                                        </span>
-
-                                        <div class="fw-semibold">
-                                            @task.Subject
-                                        </div>
-                                    </div>
-
-                                    <div class="col-md-4">
-                                        <span class="text-secondary">
-                                            Phase
-                                        </span>
-
-                                        <div class="fw-semibold">
-                                            @task.Phase
-                                        </div>
-                                    </div>
+                                <div class="row g-3 small">
 
                                     <div class="col-md-4">
                                         <span class="text-secondary">
@@ -144,396 +104,576 @@
                                         </span>
 
                                         <div class="fw-semibold">
-                                            @task.ReferenceDate
+                                            @workflow.ReferenceDate
                                             .ToString(
                                             "dd.MM.yyyy")
                                         </div>
                                     </div>
 
+                                    <div class="col-md-4">
+                                        <span class="text-secondary">
+                                            Offene Aufgaben
+                                        </span>
+
+                                        <div class="fw-semibold">
+                                            @workflow.OpenTaskCount
+                                            @GetTaskCountText(
+                                                workflow.OpenTaskCount)
+                                        </div>
+                                    </div>
+
                                 </div>
 
-                                <DecisionTaskActions Task="task"
-                                                     CurrentUserId="@(
-                                                     _currentUserId ??
-                                                     string.Empty)"
-                                                     RoleKeys="_currentRoleKeys"
-                                                     DecisionCompleted="
-                                                     HandleDecisionCompletedAsync" />
+                            </div>
 
-                                @if (task.Fields.Count > 0)
-                                {
-                                    <div class="border rounded p-3 mb-4">
+                            <div>
+                                <button type="button"
+                                        class="btn btn-primary"
+                                        @onclick="() =>
+                                                                                SelectWorkflow(
+                                                                                    workflow.WorkflowInstanceId)">
+Aufgaben öffnen
+</button>
+                            </div>
 
-                                        <div class="fw-semibold mb-3">
-                                            Aufgabendaten
+                        </div>
+
+                    </div>
+                </div>
+            }
+
+        </div>
+    }
+    else
+    {
+        var selectedWorkflow = GetSelectedWorkflow();
+        var selectedTasks = GetSelectedTasks();
+
+        @if (selectedWorkflow is not null)
+        {
+            <div class="mb-4">
+                <button type="button"
+                        class="btn btn-link
+                    text-decoration-none
+                    p-0"
+                        @onclick="ShowWorkflowOverview">
+                    ← Zurück zur Vorgangsübersicht
+                </button>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body p-4">
+
+                    <div class="text-secondary small mb-1">
+                        @selectedWorkflow.WorkflowName
+                    </div>
+
+                    <h2 class="h4 mb-3">
+                        @selectedWorkflow.Subject
+                    </h2>
+
+                    <div class="row g-3 small">
+
+                        <div class="col-md-4">
+                            <span class="text-secondary">
+                                Stichtag
+                            </span>
+
+                            <div class="fw-semibold">
+                                @selectedWorkflow.ReferenceDate
+                                .ToString(
+                                "dd.MM.yyyy")
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <span class="text-secondary">
+                                Meine offenen Aufgaben
+                            </span>
+
+                            <div class="fw-semibold">
+                                @selectedTasks.Count
+                                @GetTaskCountText(
+                                    selectedTasks.Count)
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="d-flex flex-column gap-3">
+
+                @foreach (var task in selectedTasks)
+                {
+                    <div @key="task.Id"
+                         class="card shadow-sm">
+
+                        <div class="card-body p-4">
+
+                            <div class="d-flex
+                                flex-column
+                                flex-xl-row
+                                justify-content-between
+                                gap-4">
+
+                                <div class="flex-grow-1">
+
+                                    <div class="d-flex
+                                        flex-wrap
+                                        align-items-center
+                                        gap-2
+                                        mb-2">
+
+                                        <span class="badge text-bg-light border">
+                                            @task.AssignedRoleKey
+                                        </span>
+
+                                        <span class="badge
+                                            @GetStatusBadgeClass(
+                                                task.Status)">
+                                            @GetStatusText(
+                                                task.Status)
+                                        </span>
+
+                                    </div>
+
+                                    <h2 class="h5 mb-1">
+                                        @task.Title
+                                    </h2>
+
+                                    <div class="text-secondary mb-3">
+                                        @task.WorkflowName
+                                    </div>
+
+                                    @if (!string.IsNullOrWhiteSpace(
+                                        task.Description))
+                                    {
+                                        <p class="mb-4">
+                                            @task.Description
+                                        </p>
+                                    }
+
+                                    <div class="row g-3 small mb-4">
+
+                                        <div class="col-md-4">
+                                            <span class="text-secondary">
+                                                Mitarbeiter / Betreff
+                                            </span>
+
+                                            <div class="fw-semibold">
+                                                @task.Subject
+                                            </div>
                                         </div>
 
-                                        <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <span class="text-secondary">
+                                                Phase
+                                            </span>
 
-                                            @foreach (var field in
-                                                task.Fields
-                                                    .OrderBy(
-                                                        field =>
-                                                            field.SortOrder))
-                                            {
-                                                <div class="col-lg-6">
+                                            <div class="fw-semibold">
+                                                @task.Phase
+                                            </div>
+                                        </div>
 
-                                                    <label class="form-label"
-                                                           for="@GetFieldInputId(
-                                                                                                                       task.Id,
-                                                                                                                       field.SortOrder)">
+                                        <div class="col-md-4">
+                                            <span class="text-secondary">
+                                                Stichtag
+                                            </span>
 
-                                                        @field.Label
+                                            <div class="fw-semibold">
+                                                @task.ReferenceDate
+                                                .ToString(
+                                                "dd.MM.yyyy")
+                                            </div>
+                                        </div>
 
-                                                        @if (field.IsRequired)
-                                                        {
-                                                            <span class="text-danger">
-                                                                *
-                                                            </span>
-                                                        }
+                                    </div>
 
-                                                    </label>
+                                    <DecisionTaskActions Task="task"
+                                                         CurrentUserId="@(
+                                                         _currentUserId ??
+                                                         string.Empty)"
+                                                         RoleKeys="_currentRoleKeys"
+                                                         DecisionCompleted="
+                                                         HandleDecisionCompletedAsync" />
 
-                                                    <div class="input-group">
+                                    @if (task.Fields.Count > 0)
+                                    {
+                                        <div class="border rounded p-3 mb-4">
 
-                                                        <input id="@GetFieldInputId(
-                                                                                                                           task.Id,
-                                                                                                                           field.SortOrder)"
-                                                               type="@GetFieldInputType(
-                                                                                                                           field.FieldType)"
-                                                               class="form-control"
-                                                               maxlength="2000"
-                                                               autocomplete="off"
-                                                               placeholder="@GetFieldPlaceholder(
-                                                                                                                           field)"
-                                                               value="@GetFieldDraft(
-                                                                                                                           task.Id,
-                                                                                                                           field.Key)"
-                                                               disabled="@IsSavingField(
-                                                                                                                           task.Id,
-                                                                                                                           field.Key)"
-                                                               @oninput="args =>
-                                                                                                                           SetFieldDraft(
+                                            <div class="fw-semibold mb-3">
+                                                Aufgabendaten
+                                            </div>
+
+                                            <div class="row g-3">
+
+                                                @foreach (var field in
+                                                    task.Fields
+                                                        .OrderBy(
+                                                            field =>
+                                                                field.SortOrder))
+                                                {
+                                                    <div class="col-lg-6">
+
+                                                        <label class="form-label"
+                                                               for="@GetFieldInputId(
                                                                                                                                task.Id,
-                                                                                                                               field.Key,
-                                                                                                                               args.Value?
-                                                                                                                                   .ToString())" />
+                                                                                                                               field.SortOrder)">
 
-                                                        @if (field.FieldType == 1
-                                                            &&
-                                                            field.HasStoredValue
-                                                            &&
-                                                            CanRevealSecrets())
-                                                        {
+                                                            @field.Label
+
+                                                            @if (field.IsRequired)
+                                                            {
+                                                                <span class="text-danger">
+                                                                    *
+                                                                </span>
+                                                            }
+
+                                                        </label>
+
+                                                        <div class="input-group">
+
+                                                            <input id="@GetFieldInputId(
+                                                                                                                                   task.Id,
+                                                                                                                                   field.SortOrder)"
+                                                                   type="@GetFieldInputType(
+                                                                                                                                   field.FieldType)"
+                                                                   class="form-control"
+                                                                   maxlength="2000"
+                                                                   autocomplete="off"
+                                                                   placeholder="@GetFieldPlaceholder(
+                                                                                                                                   field)"
+                                                                   value="@GetFieldDraft(
+                                                                                                                                   task.Id,
+                                                                                                                                   field.Key)"
+                                                                   disabled="@IsSavingField(
+                                                                                                                                   task.Id,
+                                                                                                                                   field.Key)"
+                                                                   @oninput="args =>
+                                                                                                                                   SetFieldDraft(
+                                                                                                                                       task.Id,
+                                                                                                                                       field.Key,
+                                                                                                                                       args.Value?
+                                                                                                                                           .ToString())" />
+
+                                                            @if (field.FieldType == 1
+                                                                &&
+                                                                field.HasStoredValue
+                                                                &&
+                                                                CanRevealSecrets())
+                                                            {
+                                                                <button type="button"
+                                                                        class="btn
+                                                                    btn-outline-secondary"
+                                                                        disabled="@IsRevealingSecret(
+                                                                                                                                                task.Id,
+                                                                                                                                                field.Key)"
+                                                                        @onclick="() =>
+                                                                                                                                                ToggleSecretAsync(
+                                                                                                                                                    task.Id,
+                                                                                                                                                    field.Key)">
+
+                                                                    @if (IsRevealingSecret(
+                                                                        task.Id,
+                                                                        field.Key))
+                                                                    {
+                                                                        <span>
+                                                                            Laden...
+                                                                        </span>
+                                                                    }
+                                                                    else if (IsSecretRevealed(
+                                                                        task.Id,
+                                                                        field.Key))
+                                                                    {
+                                                                        <span>
+                                                                            Ausblenden
+                                                                        </span>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <span>
+                                                                            Anzeigen
+                                                                        </span>
+                                                                    }
+
+                                                                </button>
+                                                            }
+
                                                             <button type="button"
                                                                     class="btn
                                                                 btn-outline-secondary"
-                                                                    disabled="@IsRevealingSecret(
+                                                                    disabled="@(!CanSaveField(
                                                                                                                                         task.Id,
-                                                                                                                                        field.Key)"
+                                                                                                                                        field))"
                                                                     @onclick="() =>
-                                                                                                                                        ToggleSecretAsync(
+                                                                                                                                        SaveFieldAsync(
                                                                                                                                             task.Id,
                                                                                                                                             field.Key)">
 
-                                                                @if (IsRevealingSecret(
+                                                                @if (IsSavingField(
                                                                     task.Id,
                                                                     field.Key))
                                                                 {
                                                                     <span>
-                                                                        Laden...
-                                                                    </span>
-                                                                }
-                                                                else if (IsSecretRevealed(
-                                                                    task.Id,
-                                                                    field.Key))
-                                                                {
-                                                                    <span>
-                                                                        Ausblenden
+                                                                        Speichern...
                                                                     </span>
                                                                 }
                                                                 else
                                                                 {
                                                                     <span>
-                                                                        Anzeigen
+                                                                        Speichern
                                                                     </span>
                                                                 }
 
                                                             </button>
-                                                        }
 
-                                                        <button type="button"
-                                                                class="btn
-                                                            btn-outline-secondary"
-                                                                disabled="@(!CanSaveField(
-                                                                                                                                task.Id,
-                                                                                                                                field))"
-                                                                @onclick="() =>
-                                                                                                                                SaveFieldAsync(
-                                                                                                                                    task.Id,
-                                                                                                                                    field.Key)">
+                                                        </div>
 
-                                                            @if (IsSavingField(
-                                                                task.Id,
-                                                                field.Key))
+                                                        @if (field.FieldType == 1)
+                                                        {
+                                                            @if (field.HasStoredValue)
                                                             {
-                                                                <span>
-                                                                    Speichern...
-                                                                </span>
+                                                                <div class="form-text">
+                                                                    Ein geschützter Wert
+                                                                    ist gespeichert.
+                                                                    Ein neuer Wert ersetzt
+                                                                    den vorhandenen Wert.
+                                                                </div>
                                                             }
                                                             else
                                                             {
-                                                                <span>
-                                                                    Speichern
-                                                                </span>
+                                                                <div class="form-text">
+                                                                    Der Wert wird
+                                                                    verschlüsselt gespeichert.
+                                                                </div>
                                                             }
 
-                                                        </button>
+                                                            @if (IsSecretRevealed(
+                                                                task.Id,
+                                                                field.Key))
+                                                            {
+                                                                <div class="alert
+                                                                    alert-warning
+                                                                    py-2
+                                                                    px-3
+                                                                    mt-2
+                                                                    mb-0">
+
+                                                                    <div class="small
+                                                                        text-secondary">
+                                                                        Geschützter Wert
+                                                                    </div>
+
+                                                                    <div class="fw-semibold">
+                                                                        <code>
+                                                                            @GetRevealedSecret(
+                                                                                task.Id,
+                                                                                field.Key)
+                                                                        </code>
+                                                                    </div>
+
+                                                                </div>
+                                                            }
+                                                        }
+                                                        else if (IsSavedField(
+                                                            task.Id,
+                                                            field.Key))
+                                                        {
+                                                            <div class="form-text
+                                                                text-success">
+                                                                Wert gespeichert.
+                                                            </div>
+                                                        }
+
+                                                        @if (field.FieldType == 1
+                                                            &&
+                                                            IsSavedField(
+                                                                task.Id,
+                                                                field.Key))
+                                                        {
+                                                            <div class="form-text
+                                                                text-success">
+                                                                Wert verschlüsselt
+                                                                gespeichert.
+                                                            </div>
+                                                        }
 
                                                     </div>
+                                                }
 
-                                                    @if (field.FieldType == 1)
-                                                    {
-                                                        @if (field.HasStoredValue)
-                                                        {
-                                                            <div class="form-text">
-                                                                Ein geschützter Wert
-                                                                ist gespeichert.
-                                                                Ein neuer Wert ersetzt
-                                                                den vorhandenen Wert.
-                                                            </div>
-                                                        }
-                                                        else
-                                                        {
-                                                            <div class="form-text">
-                                                                Der Wert wird
-                                                                verschlüsselt gespeichert.
-                                                            </div>
-                                                        }
+                                            </div>
 
-                                                        @if (IsSecretRevealed(
-                                                            task.Id,
-                                                            field.Key))
-                                                        {
-                                                            <div class="alert
-                                                                alert-warning
-                                                                py-2
-                                                                px-3
-                                                                mt-2
-                                                                mb-0">
+                                            <div class="form-text mt-3">
+                                                * Pflichtfeld
+                                            </div>
 
-                                                                <div class="small
-                                                                    text-secondary">
-                                                                    Geschützter Wert
-                                                                </div>
+                                        </div>
+                                    }
 
-                                                                <div class="fw-semibold">
-                                                                    <code>
-                                                                        @GetRevealedSecret(
-                                                                            task.Id,
-                                                                            field.Key)
-                                                                    </code>
-                                                                </div>
+                                    <div>
+                                        <label class="form-label"
+                                               for="@($"comment-{task.Id}")">
+                                            Notiz / Kommentar
+                                        </label>
 
-                                                            </div>
-                                                        }
-                                                    }
-                                                    else if (IsSavedField(
-                                                        task.Id,
-                                                        field.Key))
-                                                    {
-                                                        <div class="form-text
-                                                            text-success">
-                                                            Wert gespeichert.
-                                                        </div>
-                                                    }
+                                        <textarea id="@($"comment-{task.Id}")"
+                                                  class="form-control"
+                                                  rows="3"
+                                                  maxlength="2000"
+                                                  value="@GetCommentDraft(
+                                                                                              task.Id)"
+                                                  disabled="@(
+                                                  _savingCommentTaskId ==
+                                                  task.Id)"
+                                                  @oninput="args =>
+                                                                                              SetCommentDraft(
+                                                                                                  task.Id,
+                                                                                                  args.Value?
+                                                                                                      .ToString())">
+</textarea>
 
-                                                    @if (field.FieldType == 1
-                                                        &&
-                                                        IsSavedField(
-                                                            task.Id,
-                                                            field.Key))
-                                                    {
-                                                        <div class="form-text
-                                                            text-success">
-                                                            Wert verschlüsselt
-                                                            gespeichert.
-                                                        </div>
-                                                    }
+                                    <div class="d-flex
+                                        justify-content-between
+                                        align-items-center
+                                        gap-3
+                                        mt-2">
 
-                                                </div>
+                                        <div class="small text-secondary">
+
+                                            @if (_savedCommentTaskId ==
+                                                task.Id)
+                                            {
+                                                <span>
+                                                    Notiz gespeichert.
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span>
+                                                    @GetCommentLength(
+                                                        task.Id)
+                                                    / 2000 Zeichen
+                                                </span>
                                             }
 
                                         </div>
 
-                                        <div class="form-text mt-3">
-                                            * Pflichtfeld
-                                        </div>
+                                        <button type="button"
+                                                class="btn
+                                            btn-sm
+                                            btn-outline-secondary"
+                                                disabled="@(
+                                                _savingCommentTaskId ==
+                                                task.Id)"
+                                                @onclick="() =>
+                                                                                                    SaveCommentAsync(
+                                                                                                        task.Id)">
 
+                                                @if (_savingCommentTaskId ==
+                                                    task.Id)
+                                            {
+                                                <span>
+                                                    Speichern...
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span>
+                                                    Notiz speichern
+                                                </span>
+                                            }
+
+                                        </button>
+
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div style="min-width: 210px;">
+
+                                @if (task.TaskType == 1)
+                                {
+                                    <div class="form-label
+                                        small
+                                        text-secondary">
+                                        Status
+                                    </div>
+
+                                    <div class="fw-semibold">
+                                        @GetStatusText(
+                                            task.Status)
+                                    </div>
+
+                                    <div class="small
+                                        text-secondary
+                                        mt-2">
+                                        Diese Aufgabe wird über
+                                        eine Antwort auf die
+                                        Entscheidung abgeschlossen.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <label class="form-label
+                                        small
+                                        text-secondary"
+                                           for="@($"status-{task.Id}")">
+                                        Status
+                                    </label>
+
+                                    <select id="@($"status-{task.Id}")"
+                                            class="form-select"
+                                            value="@task.Status"
+                                            disabled="@(
+                                            _updatingTaskId ==
+                                            task.Id)"
+                                            @onchange="args =>
+                                                                                            UpdateTaskStatusAsync(
+                                                                                                task.Id,
+                                                                                                args)">
+
+<option value="0">
+                                            Offen
+                                        </option>
+
+                                        <option value="1">
+                                            In Bearbeitung
+                                        </option>
+
+                                        <option value="2">
+                                            Erledigt
+                                        </option>
+
+                                        <option value="3">
+                                            Blockiert
+                                        </option>
+
+                                        <option value="4">
+                                            Nicht erforderlich
+                                        </option>
+
+                                    </select>
+
+                                    <div class="small text-secondary mt-2">
+                                        Erledigte oder nicht erforderliche
+                                        Aufgaben verschwinden aus dieser Liste.
                                     </div>
                                 }
 
-                                <div>
-                                    <label class="form-label"
-                                           for="@($"comment-{task.Id}")">
-                                        Notiz / Kommentar
-                                    </label>
-
-                                    <textarea id="@($"comment-{task.Id}")"
-                                              class="form-control"
-                                              rows="3"
-                                              maxlength="2000"
-                                              value="@GetCommentDraft(
-                                                                                      task.Id)"
-                                              disabled="@(
-                                              _savingCommentTaskId ==
-                                              task.Id)"
-                                              @oninput="args =>
-                                                                                      SetCommentDraft(
-                                                                                          task.Id,
-                                                                                          args.Value?
-                                                                                              .ToString())">
-</textarea>
-
-                                <div class="d-flex
-                                    justify-content-between
-                                    align-items-center
-                                    gap-3
-                                    mt-2">
-
-                                    <div class="small text-secondary">
-
-                                        @if (_savedCommentTaskId ==
-                                            task.Id)
-                                        {
-                                            <span>
-                                                Notiz gespeichert.
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <span>
-                                                @GetCommentLength(
-                                                    task.Id)
-                                                / 2000 Zeichen
-                                            </span>
-                                        }
-
-                                    </div>
-
-                                    <button type="button"
-                                            class="btn
-                                        btn-sm
-                                        btn-outline-secondary"
-                                            disabled="@(
-                                            _savingCommentTaskId ==
-                                            task.Id)"
-                                            @onclick="() =>
-                                                                                            SaveCommentAsync(
-                                                                                                task.Id)">
-
-                                            @if (_savingCommentTaskId ==
-                                                task.Id)
-                                        {
-                                            <span>
-                                                Speichern...
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <span>
-                                                Notiz speichern
-                                            </span>
-                                        }
-
-                                    </button>
-
-                                </div>
                             </div>
-
-                        </div>
-
-                        <div style="min-width: 210px;">
-
-                            @if (task.TaskType == 1)
-                            {
-                                <div class="form-label
-                                    small
-                                    text-secondary">
-                                    Status
-                                </div>
-
-                                <div class="fw-semibold">
-                                    @GetStatusText(
-                                        task.Status)
-                                </div>
-
-                                <div class="small
-                                    text-secondary
-                                    mt-2">
-                                    Diese Aufgabe wird über
-                                    eine Antwort auf die
-                                    Entscheidung abgeschlossen.
-                                </div>
-                            }
-                            else
-                            {
-                                <label class="form-label
-                                    small
-                                    text-secondary"
-                                       for="@($"status-{task.Id}")">
-                                    Status
-                                </label>
-
-                                <select id="@($"status-{task.Id}")"
-                                        class="form-select"
-                                        value="@task.Status"
-                                        disabled="@(
-                                        _updatingTaskId ==
-                                        task.Id)"
-                                        @onchange="args =>
-                                                                                    UpdateTaskStatusAsync(
-                                                                                        task.Id,
-                                                                                        args)">
-
-<option value="0">
-                                        Offen
-                                    </option>
-
-                                    <option value="1">
-                                        In Bearbeitung
-                                    </option>
-
-                                    <option value="2">
-                                        Erledigt
-                                    </option>
-
-                                    <option value="3">
-                                        Blockiert
-                                    </option>
-
-                                    <option value="4">
-                                        Nicht erforderlich
-                                    </option>
-
-                                </select>
-
-                                <div class="small text-secondary mt-2">
-                                    Erledigte oder nicht erforderliche
-                                    Aufgaben verschwinden aus dieser Liste.
-                                </div>
-                            }
 
                         </div>
 
                     </div>
 
                 </div>
+            }
 
-            </div>
-        }
-
-    </div>
+        </div>
+    }
 }
 
 </div>
@@ -560,6 +700,8 @@
         Array.Empty<string>();
 
     private string? _currentUserId;
+
+    private Guid? _selectedWorkflowInstanceId;
 
     private bool _isLoading = true;
 
@@ -651,6 +793,117 @@
                     _currentRoleKeys);
 
         RemoveRevealedSecretsForMissingTasks();
+
+        if (_selectedWorkflowInstanceId is not null
+            &&
+            !_tasks.Any(task =>
+                task.WorkflowInstanceId ==
+                _selectedWorkflowInstanceId.Value))
+        {
+            _selectedWorkflowInstanceId =
+                null;
+        }
+    }
+
+    private IReadOnlyList<MyWorkflowGroupItem>
+        GetWorkflowGroups()
+    {
+        return
+            _tasks
+                .GroupBy(task =>
+                    task.WorkflowInstanceId)
+                .Select(group =>
+                {
+                    var firstTask =
+                        group
+                            .OrderBy(task =>
+                                task.SortOrder)
+                            .ThenBy(task =>
+                                task.Key)
+                            .First();
+
+                    return
+                        new MyWorkflowGroupItem(
+                            firstTask.WorkflowInstanceId,
+                            firstTask.WorkflowName,
+                            firstTask.Subject,
+                            firstTask.ReferenceDate,
+                            group.Count());
+                })
+                .OrderBy(workflow =>
+                    workflow.ReferenceDate)
+                .ThenBy(workflow =>
+                    workflow.WorkflowName)
+                .ThenBy(workflow =>
+                    workflow.Subject)
+                .ToArray();
+    }
+
+    private MyWorkflowGroupItem?
+        GetSelectedWorkflow()
+    {
+        if (_selectedWorkflowInstanceId is null)
+        {
+            return null;
+        }
+
+        return
+            GetWorkflowGroups()
+                .FirstOrDefault(workflow =>
+                    workflow.WorkflowInstanceId ==
+                    _selectedWorkflowInstanceId.Value);
+    }
+
+    private IReadOnlyList<MyTaskItem>
+        GetSelectedTasks()
+    {
+        if (_selectedWorkflowInstanceId is null)
+        {
+            return
+                Array.Empty<MyTaskItem>();
+        }
+
+        return
+            _tasks
+                .Where(task =>
+                    task.WorkflowInstanceId ==
+                    _selectedWorkflowInstanceId.Value)
+                .OrderBy(task =>
+                    task.SortOrder)
+                .ThenBy(task =>
+                    task.Key)
+                .ToArray();
+    }
+
+    private void SelectWorkflow(
+        Guid workflowInstanceId)
+    {
+        _selectedWorkflowInstanceId =
+            workflowInstanceId;
+
+        _savedCommentTaskId =
+            null;
+
+        _savedField =
+            null;
+
+        _errorMessage =
+            null;
+    }
+
+    private void ShowWorkflowOverview()
+    {
+        _selectedWorkflowInstanceId =
+            null;
+
+        _savedCommentTaskId =
+            null;
+
+        _savedField =
+            null;
+
+        _errorMessage =
+            null;
     }
 
     private async Task HandleDecisionCompletedAsync()
@@ -1224,6 +1477,14 @@
             : "Aufgaben";
     }
 
+    private static string GetWorkflowCountText(
+        int count)
+    {
+        return count == 1
+            ? "laufender Vorgang"
+            : "laufende Vorgänge";
+    }
+
     private static string GetStatusText(
         int status)
     {
@@ -1251,4 +1512,11 @@
             _ => "text-bg-dark"
         };
     }
+
+    private sealed record MyWorkflowGroupItem(
+        Guid WorkflowInstanceId,
+        string WorkflowName,
+        string Subject,
+        DateOnly ReferenceDate,
+        int OpenTaskCount);
 }
