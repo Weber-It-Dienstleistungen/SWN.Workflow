@@ -7,6 +7,7 @@
 @attribute [Authorize(Roles = "USER_ADMIN")]
 
 @inject IEmailSender EmailSender
+@inject IWorkflowNotificationDispatcher WorkflowNotificationDispatcher
 
 <PageTitle>E-Mail-Test</PageTitle>
 
@@ -22,19 +23,18 @@
         </h1>
 
         <p class="text-secondary mb-0">
-            Kontrollierter Funktionstest des konfigurierten
-            SMTP-Versands.
+            Kontrollierte Funktionstests des konfigurierten
+            SMTP-Versands und der Workflow-Benachrichtigungen.
         </p>
     </div>
 
     <div class="alert alert-info">
-        Diese Funktion versendet genau eine Testnachricht
-        an die angegebene Empfängeradresse.
-        Es werden keine Workflow-Aufgaben ausgelöst
-        oder verändert.
+        Die Funktionen auf dieser Seite werden ausschließlich
+        manuell ausgelöst. Es erfolgt kein automatischer Versand
+        beim Öffnen der Seite.
     </div>
 
-    <div class="card shadow-sm">
+    <div class="card shadow-sm mb-4">
 
         <div class="card-header bg-body fw-semibold">
             Testnachricht senden
@@ -152,6 +152,74 @@
         </div>
     </div>
 
+    <div class="card shadow-sm">
+
+        <div class="card-header bg-body fw-semibold">
+            Wartende Workflow-Benachrichtigungen
+        </div>
+
+        <div class="card-body">
+
+            <p>
+                Wartende Benachrichtigungen vom Typ
+                <strong>„Aufgabe verfügbar“</strong>
+                können hier kontrolliert versendet werden.
+            </p>
+
+            <p class="text-secondary">
+                Mehrere wartende Aufgaben desselben Empfängers
+                innerhalb desselben Vorgangs werden zu
+                <strong>einer E-Mail</strong> zusammengefasst.
+                Die einzelnen Benachrichtigungseinträge bleiben
+                für Status und Nachvollziehbarkeit erhalten.
+            </p>
+
+            <div class="alert alert-warning">
+                Der Button verarbeitet alle momentan wartenden
+                Aufgabenbenachrichtigungen.
+                Für jeden betroffenen Empfänger und Vorgang
+                kann dabei eine E-Mail versendet werden.
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(
+                _dispatchSuccessMessage))
+            {
+                <div class="alert alert-success">
+                    @_dispatchSuccessMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(
+                _dispatchErrorMessage))
+            {
+                <div class="alert alert-danger">
+                    @_dispatchErrorMessage
+                </div>
+            }
+
+            <button type="button"
+                    class="btn btn-outline-primary"
+                    disabled="@_isDispatching"
+                    @onclick="DispatchPendingNotificationsAsync">
+
+                @if (_isDispatching)
+                {
+                    <span>
+                        Benachrichtigungen werden verarbeitet...
+                    </span>
+                }
+                else
+                {
+                    <span>
+                        Wartende Benachrichtigungen senden
+                    </span>
+                }
+
+            </button>
+
+        </div>
+    </div>
+
 </div>
 
 @code {
@@ -160,9 +228,15 @@
 
     private bool _isSending;
 
+    private bool _isDispatching;
+
     private string? _successMessage;
 
     private string? _errorMessage;
+
+    private string? _dispatchSuccessMessage;
+
+    private string? _dispatchErrorMessage;
 
     private async Task SendTestEmailAsync()
     {
@@ -232,6 +306,57 @@
         finally
         {
             _isSending =
+                false;
+        }
+    }
+
+    private async Task DispatchPendingNotificationsAsync()
+    {
+        _isDispatching =
+            true;
+
+        _dispatchSuccessMessage =
+            null;
+
+        _dispatchErrorMessage =
+            null;
+
+        try
+        {
+            var result =
+                await WorkflowNotificationDispatcher
+                    .DispatchPendingTaskAvailableAsync();
+
+            if (result.ProcessedGroupCount == 0 &&
+                result.FailedNotificationCount == 0)
+            {
+                _dispatchSuccessMessage =
+                    "Es waren keine wartenden " +
+                    "Aufgabenbenachrichtigungen vorhanden.";
+
+                return;
+            }
+
+            _dispatchSuccessMessage =
+                $"Verarbeitung abgeschlossen. " +
+                $"Gruppen verarbeitet: {result.ProcessedGroupCount}, " +
+                $"E-Mails erfolgreich: {result.SentGroupCount}, " +
+                $"E-Mails fehlgeschlagen: {result.FailedGroupCount}, " +
+                $"Benachrichtigungen erfolgreich: " +
+                $"{result.SentNotificationCount}, " +
+                $"Benachrichtigungen fehlgeschlagen: " +
+                $"{result.FailedNotificationCount}.";
+        }
+        catch (Exception exception)
+        {
+            _dispatchErrorMessage =
+                "Die wartenden Benachrichtigungen konnten " +
+                "nicht verarbeitet werden: " +
+                exception.Message;
+        }
+        finally
+        {
+            _isDispatching =
                 false;
         }
     }

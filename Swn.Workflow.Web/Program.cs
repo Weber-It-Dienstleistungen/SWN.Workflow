@@ -24,6 +24,7 @@ builder.Services.AddScoped<IMyTaskService, MyTaskService>();
 builder.Services.AddScoped<IUserDirectoryService, UserDirectoryService>();
 builder.Services.AddScoped<IUserAdministrationService, UserAdministrationService>();
 builder.Services.AddScoped<IWorkflowNotificationService, WorkflowNotificationService>();
+builder.Services.AddScoped<IWorkflowNotificationDispatcher, WorkflowNotificationDispatcher>();
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 
 var smtpSettings =
