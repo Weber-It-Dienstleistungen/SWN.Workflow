@@ -2,12 +2,14 @@
 
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Authorization
+@using Swn.Workflow.Application
 @using Swn.Workflow.Infrastructure
 
 @attribute [Authorize(Roles = "USER_ADMIN")]
 
 @inject IEmailConfigurationService EmailConfigurationService
 @inject IExchangeEwsConnectionTester ExchangeEwsConnectionTester
+@inject ExchangeEwsEmailSender ExchangeEwsEmailSender
 
 <PageTitle>Konfiguration</PageTitle>
 
@@ -258,7 +260,9 @@
 
                                 <button type="button"
                                         class="btn btn-outline-primary"
-                                        disabled="@(_isTestingExchange || _isSaving)"
+                                        disabled="@(_isTestingExchange ||
+                                                                                        _isSendingExchangeTest ||
+                                                                                        _isSaving)"
                                         @onclick="TestExchangeAsync">
 
                                     @if (_isTestingExchange)
@@ -271,6 +275,74 @@
                                     {
                                         <span>
                                             Exchange-Verbindung testen
+                                        </span>
+                                    }
+
+                                </button>
+
+                                <hr class="my-4" />
+
+                                <div class="fw-semibold mb-2">
+                                    EWS-Testnachricht
+                                </div>
+
+                                <div class="text-secondary small mb-3">
+                                    Die Nachricht wird über die zuletzt
+                                    gespeicherte Exchange-Konfiguration
+                                    versendet und als Kopie im Ordner
+                                    „Gesendete Elemente“ abgelegt.
+                                </div>
+
+                                <div class="mb-3">
+
+                                    <label class="form-label"
+                                           for="exchangeTestRecipient">
+                                        Testempfänger
+                                    </label>
+
+                                    <InputText id="exchangeTestRecipient"
+                                               class="form-control"
+                                               type="email"
+                                               autocomplete="off"
+                                               @bind-Value="_model.ExchangeTestRecipientAddress" />
+
+                                    <ValidationMessage For="@(() => _model.ExchangeTestRecipientAddress)" />
+
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(
+                                    _exchangeSendSuccessMessage))
+                                {
+                                    <div class="alert alert-success">
+                                        @_exchangeSendSuccessMessage
+                                    </div>
+                                }
+
+                                @if (!string.IsNullOrWhiteSpace(
+                                    _exchangeSendErrorMessage))
+                                {
+                                    <div class="alert alert-danger">
+                                        @_exchangeSendErrorMessage
+                                    </div>
+                                }
+
+                                <button type="button"
+                                        class="btn btn-outline-primary"
+                                        disabled="@(_isSendingExchangeTest ||
+                                                                                        _isTestingExchange ||
+                                                                                        _isSaving)"
+                                        @onclick="SendExchangeTestEmailAsync">
+
+                                    @if (_isSendingExchangeTest)
+                                    {
+                                        <span>
+                                            EWS-Testnachricht wird gesendet...
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span>
+                                            EWS-Testnachricht senden
                                         </span>
                                     }
 
@@ -440,7 +512,9 @@
 
                     <button type="submit"
                             class="btn btn-primary"
-                            disabled="@(_isSaving || _isTestingExchange)">
+                            disabled="@(_isSaving ||
+                                                                _isTestingExchange ||
+                                                                _isSendingExchangeTest)">
 
                         @if (_isSaving)
                         {
@@ -477,6 +551,8 @@
 
     private bool _isTestingExchange;
 
+    private bool _isSendingExchangeTest;
+
     private bool _hasPassword;
 
     private string? _loadErrorMessage;
@@ -488,6 +564,10 @@
     private string? _exchangeTestSuccessMessage;
 
     private string? _exchangeTestErrorMessage;
+
+    private string? _exchangeSendSuccessMessage;
+
+    private string? _exchangeSendErrorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -509,6 +589,9 @@
 
     private async Task LoadAsync()
     {
+        var existingTestRecipient =
+            _model.ExchangeTestRecipientAddress;
+
         var configuration =
             await EmailConfigurationService
                 .GetAsync();
@@ -550,7 +633,13 @@
                     configuration.UseAutodiscover,
 
                 EwsServiceUrl =
-                    configuration.EwsServiceUrl
+                    configuration.EwsServiceUrl,
+
+                ExchangeTestRecipientAddress =
+                    string.IsNullOrWhiteSpace(
+                        existingTestRecipient)
+                        ? configuration.SenderAddress
+                        : existingTestRecipient
             };
 
         _hasPassword =
@@ -572,6 +661,12 @@
             null;
 
         _exchangeTestErrorMessage =
+            null;
+
+        _exchangeSendSuccessMessage =
+            null;
+
+        _exchangeSendErrorMessage =
             null;
 
         try
@@ -676,6 +771,85 @@
         }
     }
 
+    private async Task SendExchangeTestEmailAsync()
+    {
+        _exchangeSendSuccessMessage =
+            null;
+
+        _exchangeSendErrorMessage =
+            null;
+
+        var recipientAddress =
+            _model.ExchangeTestRecipientAddress.Trim();
+
+        var emailValidator =
+            new EmailAddressAttribute();
+
+        if (string.IsNullOrWhiteSpace(
+                recipientAddress) ||
+            !emailValidator.IsValid(
+                recipientAddress))
+        {
+            _exchangeSendErrorMessage =
+                "Bitte eine gültige Testempfänger-Adresse angeben.";
+
+            return;
+        }
+
+        _isSendingExchangeTest =
+            true;
+
+        try
+        {
+            var sentAt =
+                DateTimeOffset.Now;
+
+            var textBody =
+                $"""
+                Guten Tag,
+
+                diese Nachricht wurde über Exchange Web Services
+                vom neuen SWN Workflow-System versendet.
+
+                Sie dient ausschließlich als technischer Funktionstest.
+                Es ist keine Aktion erforderlich.
+
+                Zeitpunkt des Tests:
+                {sentAt:dd.MM.yyyy HH:mm:ss zzz}
+
+                Viele Grüße
+                SWN Workflow
+                """;
+
+            var message =
+                new EmailMessage(
+                    recipientAddress,
+                    null,
+                    "SWN Workflow – EWS-Testbenachrichtigung",
+                    textBody);
+
+            await ExchangeEwsEmailSender
+                .SendAsync(
+                    message);
+
+            _exchangeSendSuccessMessage =
+                $"Die EWS-Testnachricht wurde an " +
+                $"'{recipientAddress}' gesendet.";
+        }
+        catch (Exception exception)
+        {
+            _exchangeSendErrorMessage =
+                "Die EWS-Testnachricht konnte nicht " +
+                "gesendet werden: " +
+                exception.Message;
+        }
+        finally
+        {
+            _isSendingExchangeTest =
+                false;
+        }
+    }
+
     private sealed class EmailConfigurationFormModel
     {
         public bool Enabled { get; set; }
@@ -746,6 +920,16 @@
             ErrorMessage =
                 "Der EWS-Endpunkt darf maximal 2000 Zeichen lang sein.")]
         public string EwsServiceUrl { get; set; } =
+            string.Empty;
+
+        [EmailAddress(
+            ErrorMessage =
+                "Bitte eine gültige Testempfänger-Adresse angeben.")]
+        [StringLength(
+            256,
+            ErrorMessage =
+                "Die Testempfänger-Adresse darf maximal 256 Zeichen lang sein.")]
+        public string ExchangeTestRecipientAddress { get; set; } =
             string.Empty;
     }
 }

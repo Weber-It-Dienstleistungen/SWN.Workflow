@@ -27,6 +27,7 @@ builder.Services.AddScoped<IWorkflowNotificationService, WorkflowNotificationSer
 builder.Services.AddScoped<IWorkflowNotificationDispatcher, WorkflowNotificationDispatcher>();
 builder.Services.AddScoped<IEmailConfigurationService, EmailConfigurationService>();
 builder.Services.AddScoped<IExchangeEwsConnectionTester, ExchangeEwsConnectionTester>();
+builder.Services.AddScoped<ExchangeEwsEmailSender>();
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 
 var smtpSettings =
