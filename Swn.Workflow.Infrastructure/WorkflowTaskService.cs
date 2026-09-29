@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Swn.Workflow.Application;
 using Swn.Workflow.Domain;
 
@@ -11,9 +12,17 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
 
     private readonly ISecretProtector _secretProtector;
 
+    private readonly IWorkflowNotificationService
+        _workflowNotificationService;
+
+    private readonly ILogger<WorkflowTaskService>
+        _logger;
+
     public WorkflowTaskService(
         IDbContextFactory<WorkflowDbContext> dbContextFactory,
-        ISecretProtector secretProtector)
+        ISecretProtector secretProtector,
+        IWorkflowNotificationService workflowNotificationService,
+        ILogger<WorkflowTaskService> logger)
     {
         ArgumentNullException.ThrowIfNull(
             dbContextFactory);
@@ -21,11 +30,23 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         ArgumentNullException.ThrowIfNull(
             secretProtector);
 
+        ArgumentNullException.ThrowIfNull(
+            workflowNotificationService);
+
+        ArgumentNullException.ThrowIfNull(
+            logger);
+
         _dbContextFactory =
             dbContextFactory;
 
         _secretProtector =
             secretProtector;
+
+        _workflowNotificationService =
+            workflowNotificationService;
+
+        _logger =
+            logger;
     }
 
     public async Task UpdateStatusAsync(
@@ -162,17 +183,21 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                 null;
         }
 
+        IReadOnlyCollection<Guid> newlyOpenedTaskInstanceIds =
+            Array.Empty<Guid>();
+
         if (newStatus ==
                 WorkflowTaskStatus.Completed
             ||
             newStatus ==
                 WorkflowTaskStatus.NotRequired)
         {
-            await ApplyGraphTransitionsAsync(
-                db,
-                workflow.Id,
-                task.TaskDefinitionId,
-                cancellationToken);
+            newlyOpenedTaskInstanceIds =
+                await ApplyGraphTransitionsAsync(
+                    db,
+                    workflow.Id,
+                    task.TaskDefinitionId,
+                    cancellationToken);
         }
 
         await UpdateWorkflowStatusAsync(
@@ -181,6 +206,10 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
             cancellationToken);
 
         await db.SaveChangesAsync(
+            cancellationToken);
+
+        await QueueTaskAvailableNotificationsAsync(
+            newlyOpenedTaskInstanceIds,
             cancellationToken);
     }
 
@@ -351,11 +380,12 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         task.CompletedByUserId =
             changedBy;
 
-        await ApplyGraphTransitionsAsync(
-            db,
-            workflow.Id,
-            task.TaskDefinitionId,
-            cancellationToken);
+        var newlyOpenedTaskInstanceIds =
+            await ApplyGraphTransitionsAsync(
+                db,
+                workflow.Id,
+                task.TaskDefinitionId,
+                cancellationToken);
 
         await UpdateWorkflowStatusAsync(
             db,
@@ -363,6 +393,10 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
             cancellationToken);
 
         await db.SaveChangesAsync(
+            cancellationToken);
+
+        await QueueTaskAvailableNotificationsAsync(
+            newlyOpenedTaskInstanceIds,
             cancellationToken);
     }
 
@@ -826,11 +860,12 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
             secret.EncryptedValue);
     }
 
-    private static async Task ApplyGraphTransitionsAsync(
-        WorkflowDbContext db,
-        Guid workflowInstanceId,
-        Guid changedTaskDefinitionId,
-        CancellationToken cancellationToken)
+    private static async Task<IReadOnlyCollection<Guid>>
+        ApplyGraphTransitionsAsync(
+            WorkflowDbContext db,
+            Guid workflowInstanceId,
+            Guid changedTaskDefinitionId,
+            CancellationToken cancellationToken)
     {
         var workflowTasks =
             await db.TaskInstances
@@ -878,8 +913,11 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
 
         if (transitions.Count == 0)
         {
-            return;
+            return Array.Empty<Guid>();
         }
+
+        var newlyOpenedTaskInstanceIds =
+            new List<Guid>();
 
         var taskByDefinitionId =
             workflowTasks
@@ -1010,6 +1048,9 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                     targetTask.Status =
                         WorkflowTaskStatus.Open;
 
+                    newlyOpenedTaskInstanceIds.Add(
+                        targetTask.Id);
+
                     PropagateDecisionComments(
                         targetTask,
                         propagatedDecisionComments);
@@ -1031,6 +1072,44 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                     pendingSources.Enqueue(
                         targetTask.TaskDefinitionId);
                 }
+            }
+        }
+
+        return newlyOpenedTaskInstanceIds;
+    }
+
+    private async Task QueueTaskAvailableNotificationsAsync(
+        IReadOnlyCollection<Guid> taskInstanceIds,
+        CancellationToken cancellationToken)
+    {
+        foreach (var taskInstanceId
+            in taskInstanceIds)
+        {
+            try
+            {
+                var result =
+                    await _workflowNotificationService
+                        .QueueTaskAvailableAsync(
+                            taskInstanceId,
+                            cancellationToken);
+
+                _logger.LogInformation(
+                    "Task notification queued after task became available. " +
+                    "Task: {TaskInstanceId}, created: {CreatedCount}, " +
+                    "already queued: {AlreadyQueuedCount}, " +
+                    "skipped recipients: {SkippedRecipientCount}.",
+                    taskInstanceId,
+                    result.CreatedCount,
+                    result.AlreadyQueuedCount,
+                    result.SkippedRecipientCount);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "Task {TaskInstanceId} became available, " +
+                    "but its notification could not be queued.",
+                    taskInstanceId);
             }
         }
     }
