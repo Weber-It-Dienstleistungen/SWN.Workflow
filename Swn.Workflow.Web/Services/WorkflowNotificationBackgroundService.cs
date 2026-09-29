@@ -77,29 +77,23 @@ public sealed class WorkflowNotificationBackgroundService
                 scope.ServiceProvider
                     .GetRequiredService<IWorkflowNotificationDispatcher>();
 
-            var result =
+            var taskAvailableResult =
                 await dispatcher
                     .DispatchPendingTaskAvailableAsync(
                         cancellationToken);
 
-            if (result.ProcessedGroupCount == 0 &&
-                result.FailedNotificationCount == 0)
-            {
-                return;
-            }
+            LogDispatchResult(
+                "TaskAvailable",
+                taskAvailableResult);
 
-            _logger.LogInformation(
-                "Automatic workflow notification dispatch completed. " +
-                "Groups processed: {ProcessedGroupCount}, " +
-                "groups sent: {SentGroupCount}, " +
-                "groups failed: {FailedGroupCount}, " +
-                "notifications sent: {SentNotificationCount}, " +
-                "notifications failed: {FailedNotificationCount}.",
-                result.ProcessedGroupCount,
-                result.SentGroupCount,
-                result.FailedGroupCount,
-                result.SentNotificationCount,
-                result.FailedNotificationCount);
+            var workflowCompletedResult =
+                await dispatcher
+                    .DispatchPendingWorkflowCompletedAsync(
+                        cancellationToken);
+
+            LogDispatchResult(
+                "WorkflowCompleted",
+                workflowCompletedResult);
         }
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
@@ -112,5 +106,31 @@ public sealed class WorkflowNotificationBackgroundService
                 exception,
                 "Automatic workflow notification dispatch failed.");
         }
+    }
+
+    private void LogDispatchResult(
+        string notificationType,
+        WorkflowNotificationDispatchResult result)
+    {
+        if (result.ProcessedGroupCount == 0 &&
+            result.FailedNotificationCount == 0)
+        {
+            return;
+        }
+
+        _logger.LogInformation(
+            "Automatic workflow notification dispatch completed. " +
+            "Type: {NotificationType}, " +
+            "groups processed: {ProcessedGroupCount}, " +
+            "groups sent: {SentGroupCount}, " +
+            "groups failed: {FailedGroupCount}, " +
+            "notifications sent: {SentNotificationCount}, " +
+            "notifications failed: {FailedNotificationCount}.",
+            notificationType,
+            result.ProcessedGroupCount,
+            result.SentGroupCount,
+            result.FailedGroupCount,
+            result.SentNotificationCount,
+            result.FailedNotificationCount);
     }
 }

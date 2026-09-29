@@ -386,6 +386,296 @@ public sealed class WorkflowNotificationDispatcher
             failedNotificationCount);
     }
 
+    public async Task<WorkflowNotificationDispatchResult>
+        DispatchPendingWorkflowCompletedAsync(
+            CancellationToken cancellationToken = default)
+    {
+        await using var db =
+            await _dbContextFactory
+                .CreateDbContextAsync(
+                    cancellationToken);
+
+        var pendingNotifications =
+            await db.WorkflowNotifications
+                .Where(notification =>
+                    notification.Status ==
+                        WorkflowNotificationStatus.Pending
+                    &&
+                    notification.Type ==
+                        WorkflowNotificationType.WorkflowCompleted)
+                .OrderBy(notification =>
+                    notification.CreatedAt)
+                .ToListAsync(
+                    cancellationToken);
+
+        if (pendingNotifications.Count == 0)
+        {
+            return new WorkflowNotificationDispatchResult(
+                ProcessedGroupCount: 0,
+                SentGroupCount: 0,
+                FailedGroupCount: 0,
+                SentNotificationCount: 0,
+                FailedNotificationCount: 0);
+        }
+
+        var workflowInstanceIds =
+            pendingNotifications
+                .Select(notification =>
+                    notification.WorkflowInstanceId)
+                .Distinct()
+                .ToArray();
+
+        var workflowDetails =
+            await (
+                from workflowInstance
+                    in db.WorkflowInstances.AsNoTracking()
+
+                join workflowVersion
+                    in db.WorkflowVersions.AsNoTracking()
+                    on workflowInstance.WorkflowVersionId
+                    equals workflowVersion.Id
+
+                join workflowDefinition
+                    in db.WorkflowDefinitions.AsNoTracking()
+                    on workflowVersion.WorkflowDefinitionId
+                    equals workflowDefinition.Id
+
+                where
+                    workflowInstanceIds.Contains(
+                        workflowInstance.Id)
+
+                select new WorkflowCompletionNotificationDetail(
+                    workflowInstance.Id,
+                    workflowDefinition.Name,
+                    workflowInstance.Subject,
+                    workflowInstance.ReferenceDate,
+                    workflowInstance.Status)
+            )
+            .ToListAsync(
+                cancellationToken);
+
+        var workflowDetailsById =
+            workflowDetails.ToDictionary(
+                item =>
+                    item.WorkflowInstanceId);
+
+        var groups =
+            pendingNotifications
+                .GroupBy(notification =>
+                    new NotificationGroupKey(
+                        notification.WorkflowInstanceId,
+                        notification.RecipientUserId,
+                        notification.RecipientEmail))
+                .ToArray();
+
+        var processedGroupCount =
+            0;
+
+        var sentGroupCount =
+            0;
+
+        var failedGroupCount =
+            0;
+
+        var sentNotificationCount =
+            0;
+
+        var failedNotificationCount =
+            0;
+
+        foreach (var group
+            in groups)
+        {
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            processedGroupCount++;
+
+            var groupNotifications =
+                group.ToArray();
+
+            if (!workflowDetailsById.TryGetValue(
+                group.Key.WorkflowInstanceId,
+                out var workflowDetail))
+            {
+                var now =
+                    DateTime.UtcNow;
+
+                foreach (var notification
+                    in groupNotifications)
+                {
+                    MarkAsFailed(
+                        notification,
+                        now,
+                        "Der zugehörige Workflow konnte nicht geladen werden.");
+                }
+
+                failedGroupCount++;
+
+                failedNotificationCount +=
+                    groupNotifications.Length;
+
+                await db.SaveChangesAsync(
+                    cancellationToken);
+
+                continue;
+            }
+
+            if (workflowDetail.Status !=
+                WorkflowStatus.Completed)
+            {
+                var now =
+                    DateTime.UtcNow;
+
+                foreach (var notification
+                    in groupNotifications)
+                {
+                    MarkAsFailed(
+                        notification,
+                        now,
+                        "Der zugehörige Workflow ist nicht abgeschlossen.");
+                }
+
+                failedGroupCount++;
+
+                failedNotificationCount +=
+                    groupNotifications.Length;
+
+                await db.SaveChangesAsync(
+                    cancellationToken);
+
+                continue;
+            }
+
+            var user =
+                await db.Users
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(
+                        item =>
+                            item.Id ==
+                            group.Key.RecipientUserId,
+                        cancellationToken);
+
+            if (user is null ||
+                !user.IsActive)
+            {
+                var now =
+                    DateTime.UtcNow;
+
+                foreach (var notification
+                    in groupNotifications)
+                {
+                    MarkAsFailed(
+                        notification,
+                        now,
+                        "Der Empfänger ist nicht mehr als aktiver Benutzer verfügbar.");
+                }
+
+                failedGroupCount++;
+
+                failedNotificationCount +=
+                    groupNotifications.Length;
+
+                await db.SaveChangesAsync(
+                    cancellationToken);
+
+                continue;
+            }
+
+            var recipientName =
+                GetRecipientName(
+                    user);
+
+            var emailMessage =
+                CreateWorkflowCompletedEmail(
+                    group.Key.RecipientEmail,
+                    recipientName,
+                    workflowDetail.WorkflowName,
+                    workflowDetail.WorkflowSubject,
+                    workflowDetail.ReferenceDate);
+
+            var attemptAt =
+                DateTime.UtcNow;
+
+            try
+            {
+                await _emailSender.SendAsync(
+                    emailMessage,
+                    cancellationToken);
+
+                foreach (var notification
+                    in groupNotifications)
+                {
+                    notification.AttemptCount++;
+
+                    notification.LastAttemptAt =
+                        attemptAt;
+
+                    notification.Status =
+                        WorkflowNotificationStatus.Sent;
+
+                    notification.SentAt =
+                        DateTime.UtcNow;
+
+                    notification.LastError =
+                        null;
+                }
+
+                await db.SaveChangesAsync(
+                    cancellationToken);
+
+                sentGroupCount++;
+
+                sentNotificationCount +=
+                    groupNotifications.Length;
+
+                _logger.LogInformation(
+                    "Sent workflow completion notification for workflow " +
+                    "{WorkflowInstanceId} to user {RecipientUserId}.",
+                    group.Key.WorkflowInstanceId,
+                    group.Key.RecipientUserId);
+            }
+            catch (Exception exception)
+            {
+                var errorMessage =
+                    GetErrorMessage(
+                        exception);
+
+                foreach (var notification
+                    in groupNotifications)
+                {
+                    MarkAsFailed(
+                        notification,
+                        attemptAt,
+                        errorMessage);
+                }
+
+                await db.SaveChangesAsync(
+                    cancellationToken);
+
+                failedGroupCount++;
+
+                failedNotificationCount +=
+                    groupNotifications.Length;
+
+                _logger.LogError(
+                    exception,
+                    "Could not send workflow completion notification " +
+                    "for workflow {WorkflowInstanceId} " +
+                    "to user {RecipientUserId}.",
+                    group.Key.WorkflowInstanceId,
+                    group.Key.RecipientUserId);
+            }
+        }
+
+        return new WorkflowNotificationDispatchResult(
+            processedGroupCount,
+            sentGroupCount,
+            failedGroupCount,
+            sentNotificationCount,
+            failedNotificationCount);
+    }
+
     private static EmailMessage
         CreateTaskAvailableEmail(
             string recipientAddress,
@@ -488,6 +778,85 @@ public sealed class WorkflowNotificationDispatcher
             text.ToString());
     }
 
+    private static EmailMessage
+        CreateWorkflowCompletedEmail(
+            string recipientAddress,
+            string? recipientName,
+            string workflowName,
+            string workflowSubject,
+            DateOnly referenceDate)
+    {
+        var text =
+            new StringBuilder();
+
+        if (string.IsNullOrWhiteSpace(
+            recipientName))
+        {
+            text.AppendLine(
+                "Guten Tag,");
+        }
+        else
+        {
+            text.Append(
+                "Hallo ");
+
+            text.Append(
+                recipientName);
+
+            text.AppendLine(
+                ",");
+        }
+
+        text.AppendLine();
+
+        text.AppendLine(
+            "der folgende Workflow wurde vollständig abgeschlossen:");
+
+        text.AppendLine();
+
+        text.Append(
+            "Vorgang: ");
+
+        text.AppendLine(
+            workflowSubject);
+
+        text.Append(
+            "Workflow: ");
+
+        text.AppendLine(
+            workflowName);
+
+        text.Append(
+            "Stichtag: ");
+
+        text.AppendLine(
+            referenceDate.ToString(
+                "dd.MM.yyyy"));
+
+        text.AppendLine();
+
+        text.AppendLine(
+            "Der PDF-Export steht im Workflow-Manager bereit.");
+
+        text.AppendLine(
+            "Bitte melden Sie sich in SWN Workflow an und öffnen Sie " +
+            "den abgeschlossenen Vorgang, um den PDF-Export zu erstellen.");
+
+        text.AppendLine();
+
+        text.AppendLine(
+            "Viele Grüße");
+
+        text.AppendLine(
+            "SWN Workflow");
+
+        return new EmailMessage(
+            recipientAddress,
+            recipientName,
+            $"SWN Workflow – Workflow abgeschlossen: {workflowSubject}",
+            text.ToString());
+    }
+
     private static string? GetRecipientName(
         ApplicationUser user)
     {
@@ -560,4 +929,11 @@ public sealed class WorkflowNotificationDispatcher
         string TaskKey,
         string TaskTitle,
         int SortOrder);
+
+    private sealed record WorkflowCompletionNotificationDetail(
+        Guid WorkflowInstanceId,
+        string WorkflowName,
+        string WorkflowSubject,
+        DateOnly ReferenceDate,
+        WorkflowStatus Status);
 }

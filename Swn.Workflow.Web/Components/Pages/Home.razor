@@ -14,7 +14,9 @@
 <PageTitle>SWN Workflow</PageTitle>
 
 <div class="container-fluid px-0">
+
     <div class="mb-4">
+
         <h1 class="display-6 fw-semibold mb-2">
             SWN Workflow
         </h1>
@@ -22,9 +24,11 @@
         <p class="text-secondary mb-0">
             Übersicht über deine Prozesse und Aufgaben.
         </p>
+
     </div>
 
-    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    @if (!string.IsNullOrWhiteSpace(
+        _errorMessage))
     {
         <div class="alert alert-danger">
             @_errorMessage
@@ -32,9 +36,11 @@
     }
 
     <div class="row g-3 mb-4">
+
         <div class="col-md-4">
             <div class="card shadow-sm h-100">
                 <div class="card-body">
+
                     <div class="text-secondary small mb-2">
                         Eigene aktive Vorgänge
                     </div>
@@ -46,6 +52,7 @@
                     <div class="text-secondary small">
                         Von dir gestartete laufende Geschäftsprozesse
                     </div>
+
                 </div>
             </div>
         </div>
@@ -53,6 +60,7 @@
         <div class="col-md-4">
             <div class="card shadow-sm h-100">
                 <div class="card-body">
+
                     <div class="text-secondary small mb-2">
                         Meine offenen Aufgaben
                     </div>
@@ -64,6 +72,7 @@
                     <div class="text-secondary small">
                         Dir direkt oder über deine Rollen zugewiesen
                     </div>
+
                 </div>
             </div>
         </div>
@@ -71,30 +80,37 @@
         <div class="col-md-4">
             <div class="card shadow-sm h-100">
                 <div class="card-body">
+
                     <div class="text-secondary small mb-2">
-                        Verfügbare Workflows
+                        Abgeschlossene Vorgänge
                     </div>
 
                     <div class="fs-2 fw-semibold">
-                        @_availableWorkflows.Count
+                        @_completedWorkflows.Count
                     </div>
 
                     <div class="text-secondary small">
-                        Von dir startbare Workflow-Vorlagen
+                        Abgeschlossene, von dir gestartete Workflows
                     </div>
+
                 </div>
             </div>
         </div>
+
     </div>
 
     <div class="row g-4">
+
         <div class="col-lg-8">
+
             <div class="card shadow-sm">
+
                 <div class="card-header bg-body fw-semibold">
-                    Meine Vorgänge
+                    Meine aktiven Vorgänge
                 </div>
 
                 <div class="card-body p-0">
+
                     @if (_isLoading)
                     {
                         <div class="text-center text-secondary py-5">
@@ -104,6 +120,7 @@
                     else if (_activeWorkflows.Count == 0)
                     {
                         <div class="text-center py-5">
+
                             <h2 class="h5 mb-2">
                                 Keine eigenen aktiven Vorgänge
                             </h2>
@@ -112,16 +129,22 @@
                                 Von dir gestartete laufende Workflows
                                 erscheinen hier.
                             </p>
+
                         </div>
                     }
                     else
                     {
                         <div class="list-group list-group-flush">
-                            @foreach (var workflow in _activeWorkflows)
+
+                            @foreach (var workflow
+                                in _activeWorkflows)
                             {
-                                var progress = GetProgress(workflow);
+                                var progress =
+                                    GetProgress(
+                                        workflow);
 
                                 <div class="list-group-item p-4">
+
                                     <div class="d-flex
                                         flex-column
                                         flex-md-row
@@ -129,9 +152,11 @@
                                         gap-3">
 
                                         <div class="flex-grow-1">
+
                                             <div class="d-flex
                                                 align-items-center
-                                                gap-2 mb-1">
+                                                gap-2
+                                                mb-1">
 
                                                 <h2 class="h5 mb-0">
                                                     @workflow.Subject
@@ -143,6 +168,7 @@
                                                     @GetStatusText(
                                                         workflow.Status)
                                                 </span>
+
                                             </div>
 
                                             <div class="text-secondary mb-2">
@@ -150,16 +176,21 @@
                                             </div>
 
                                             <div class="small mb-3">
+
                                                 Stichtag:
+
                                                 <strong>
                                                     @(workflow.ReferenceDate
-                                                        .ToString("dd.MM.yyyy"))
+                                                        .ToString(
+                                                            "dd.MM.yyyy"))
                                                 </strong>
+
                                             </div>
 
                                             <div class="d-flex
                                                 justify-content-between
-                                                small mb-1">
+                                                small
+                                                mb-1">
 
                                                 <span>
                                                     Fortschritt
@@ -171,6 +202,7 @@
                                                     @workflow.TotalTasks
                                                     Aufgaben
                                                 </span>
+
                                             </div>
 
                                             <div class="progress"
@@ -182,34 +214,178 @@
                                                 <div class="progress-bar"
                                                      style="width: @progress%">
                                                 </div>
+
                                             </div>
+
                                         </div>
 
-                                        <div class="d-flex align-items-center">
-                                            <a class="btn btn-outline-primary"
+                                        <div class="d-flex
+                                            align-items-center">
+
+                                            <a class="btn
+                                                btn-outline-primary"
                                                href="@GetDetailUrl(
-                                                                                                  workflow.Id)">
+                                                   workflow.Id)">
                                                 Vorgang öffnen
                                             </a>
+
                                         </div>
+
                                     </div>
+
                                 </div>
                             }
+
                         </div>
                     }
+
                 </div>
+
             </div>
+
+            <div class="card shadow-sm mt-4">
+
+                <div class="card-header bg-body fw-semibold">
+                    Workflow-Manager – abgeschlossene Vorgänge
+                </div>
+
+                <div class="card-body p-0">
+
+                    @if (_isLoading)
+                    {
+                        <div class="text-center text-secondary py-5">
+                            Abgeschlossene Vorgänge werden geladen...
+                        </div>
+                    }
+                    else if (_completedWorkflows.Count == 0)
+                    {
+                        <div class="text-center py-5">
+
+                            <h2 class="h5 mb-2">
+                                Keine abgeschlossenen Vorgänge
+                            </h2>
+
+                            <p class="text-secondary mb-0">
+                                Vollständig abgeschlossene Workflows
+                                erscheinen hier und können als PDF
+                                exportiert werden.
+                            </p>
+
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="list-group list-group-flush">
+
+                            @foreach (var workflow
+                                in _completedWorkflows)
+                            {
+                                <div class="list-group-item p-4">
+
+                                    <div class="d-flex
+                                        flex-column
+                                        flex-md-row
+                                        justify-content-between
+                                        gap-3">
+
+                                        <div class="flex-grow-1">
+
+                                            <div class="d-flex
+                                                flex-wrap
+                                                align-items-center
+                                                gap-2
+                                                mb-1">
+
+                                                <h2 class="h5 mb-0">
+                                                    @workflow.Subject
+                                                </h2>
+
+                                                <span class="badge
+                                                    text-bg-success">
+                                                    Abgeschlossen
+                                                </span>
+
+                                            </div>
+
+                                            <div class="text-secondary mb-2">
+                                                @workflow.WorkflowName
+                                            </div>
+
+                                            <div class="small">
+
+                                                Stichtag:
+
+                                                <strong>
+                                                    @(workflow.ReferenceDate
+                                                        .ToString(
+                                                            "dd.MM.yyyy"))
+                                                </strong>
+
+                                            </div>
+
+                                            <div class="small
+                                                text-secondary
+                                                mt-2">
+
+                                                @workflow.CompletedTasks
+                                                von
+                                                @workflow.TotalTasks
+                                                Aufgaben abgeschlossen
+
+                                            </div>
+
+                                        </div>
+
+                                        <div class="d-flex
+                                            flex-column
+                                            flex-sm-row
+                                            align-items-stretch
+                                            align-items-sm-center
+                                            gap-2">
+
+                                            <a class="btn
+                                                btn-outline-secondary"
+                                               href="@GetDetailUrl(
+                                                   workflow.Id)">
+                                                Vorgang öffnen
+                                            </a>
+
+                                            <a class="btn btn-primary"
+                                               href="@GetPdfUrl(
+                                                   workflow.Id)">
+                                                PDF exportieren
+                                            </a>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+                            }
+
+                        </div>
+                    }
+
+                </div>
+
+            </div>
+
         </div>
 
         <div class="col-lg-4">
+
             <AuthorizeView Roles="HR">
+
                 <Authorized>
+
                     <div class="card shadow-sm">
+
                         <div class="card-header bg-body fw-semibold">
                             Neuen Vorgang starten
                         </div>
 
                         <div class="card-body">
+
                             @if (_isLoading)
                             {
                                 <div class="text-secondary">
@@ -226,15 +402,17 @@
                             else
                             {
                                 <div class="d-grid gap-3">
+
                                     @foreach (var workflow
                                         in _availableWorkflows)
                                     {
                                         <div>
+
                                             <a class="btn
                                                 btn-outline-primary
                                                 w-100"
                                                href="@GetStartUrl(
-                                                                                                  workflow.Key)">
+                                                   workflow.Key)">
                                                 @workflow.Name
                                             </a>
 
@@ -242,59 +420,85 @@
                                                 workflow.Description))
                                             {
                                                 <div class="text-secondary
-                                                    small mt-1">
+                                                    small
+                                                    mt-1">
                                                     @workflow.Description
                                                 </div>
                                             }
+
                                         </div>
                                     }
+
                                 </div>
                             }
+
                         </div>
+
                     </div>
+
                 </Authorized>
 
                 <NotAuthorized>
+
                     <div class="card shadow-sm">
+
                         <div class="card-header bg-body fw-semibold">
                             Arbeitsbereich
                         </div>
 
                         <div class="card-body">
+
                             <div class="text-secondary mb-3">
                                 Deine zugewiesenen Arbeitsschritte
                                 findest du in deinem persönlichen
                                 Aufgabenbereich.
                             </div>
 
-                            <a class="btn btn-outline-primary w-100"
+                            <a class="btn
+                                btn-outline-primary
+                                w-100"
                                href="/tasks">
                                 Meine Aufgaben öffnen
                             </a>
+
                         </div>
+
                     </div>
+
                 </NotAuthorized>
+
             </AuthorizeView>
+
         </div>
+
     </div>
+
 </div>
 
 @code {
-    private IReadOnlyList<WorkflowOverviewItem> _activeWorkflows =
-        Array.Empty<WorkflowOverviewItem>();
+    private IReadOnlyList<WorkflowOverviewItem>
+        _activeWorkflows =
+            Array.Empty<WorkflowOverviewItem>();
 
-    private IReadOnlyList<AvailableWorkflowItem> _availableWorkflows =
-        Array.Empty<AvailableWorkflowItem>();
+    private IReadOnlyList<WorkflowOverviewItem>
+        _completedWorkflows =
+            Array.Empty<WorkflowOverviewItem>();
+
+    private IReadOnlyList<AvailableWorkflowItem>
+        _availableWorkflows =
+            Array.Empty<AvailableWorkflowItem>();
 
     private int _myOpenTaskCount;
 
-    private bool _isLoading = true;
+    private bool _isLoading =
+        true;
 
     private string? _errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
-        _isLoading = true;
+        _isLoading =
+            true;
 
         try
         {
@@ -310,7 +514,8 @@
                     ClaimTypes.NameIdentifier)?
                     .Value;
 
-            if (string.IsNullOrWhiteSpace(userId))
+            if (string.IsNullOrWhiteSpace(
+                userId))
             {
                 throw new InvalidOperationException(
                     "Der angemeldete Benutzer konnte nicht ermittelt werden.");
@@ -324,7 +529,8 @@
                     .Select(claim =>
                         claim.Value)
                     .Where(role =>
-                        !string.IsNullOrWhiteSpace(role))
+                        !string.IsNullOrWhiteSpace(
+                            role))
                     .Distinct(
                         StringComparer.OrdinalIgnoreCase)
                     .ToArray();
@@ -332,6 +538,11 @@
             _activeWorkflows =
                 await DashboardService
                     .GetActiveWorkflowsForUserAsync(
+                        userId);
+
+            _completedWorkflows =
+                await DashboardService
+                    .GetCompletedWorkflowsForUserAsync(
                         userId);
 
             var myTasks =
@@ -343,7 +554,8 @@
             _myOpenTaskCount =
                 myTasks.Count;
 
-            if (user.IsInRole("HR"))
+            if (user.IsInRole(
+                "HR"))
             {
                 _availableWorkflows =
                     await DashboardService
@@ -362,7 +574,8 @@
         }
         finally
         {
-            _isLoading = false;
+            _isLoading =
+                false;
         }
     }
 
@@ -370,7 +583,9 @@
         string workflowKey)
     {
         return
-            $"/workflow/start/{Uri.EscapeDataString(workflowKey)}";
+            $"/workflow/start/" +
+            Uri.EscapeDataString(
+                workflowKey);
     }
 
     private static string GetDetailUrl(
@@ -378,6 +593,13 @@
     {
         return
             $"/workflow/{workflowInstanceId}";
+    }
+
+    private static string GetPdfUrl(
+        Guid workflowInstanceId)
+    {
+        return
+            $"/workflow/{workflowInstanceId}/pdf";
     }
 
     private static int GetProgress(

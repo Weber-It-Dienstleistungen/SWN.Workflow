@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
@@ -26,6 +27,7 @@ builder.Services.AddScoped<IUserDirectoryService, UserDirectoryService>();
 builder.Services.AddScoped<IUserAdministrationService, UserAdministrationService>();
 builder.Services.AddScoped<IWorkflowNotificationService, WorkflowNotificationService>();
 builder.Services.AddScoped<IWorkflowNotificationDispatcher, WorkflowNotificationDispatcher>();
+builder.Services.AddScoped<IWorkflowPdfExportService, WorkflowPdfExportService>();
 
 builder.Services.AddScoped<IEmailConfigurationService, EmailConfigurationService>();
 builder.Services.AddScoped<IExchangeEwsConnectionTester, ExchangeEwsConnectionTester>();
@@ -154,6 +156,43 @@ app.MapPost(
 
         return Results.Redirect("/login");
     });
+
+app.MapGet(
+        "/workflow/{workflowInstanceId:guid}/pdf",
+        async (
+            Guid workflowInstanceId,
+            ClaimsPrincipal user,
+            IWorkflowPdfExportService pdfExportService,
+            CancellationToken cancellationToken) =>
+        {
+            var userId =
+                user.FindFirstValue(
+                    ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrWhiteSpace(
+                userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var result =
+                await pdfExportService
+                    .CreateForInitiatorAsync(
+                        workflowInstanceId,
+                        userId,
+                        cancellationToken);
+
+            if (result is null)
+            {
+                return Results.NotFound();
+            }
+
+            return Results.File(
+                result.Content,
+                "application/pdf",
+                result.FileName);
+        })
+    .RequireAuthorization();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

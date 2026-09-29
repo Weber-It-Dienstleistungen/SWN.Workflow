@@ -5,6 +5,10 @@ public interface IWorkflowNotificationDispatcher
     Task<WorkflowNotificationDispatchResult>
         DispatchPendingTaskAvailableAsync(
             CancellationToken cancellationToken = default);
+
+    Task<WorkflowNotificationDispatchResult>
+        DispatchPendingWorkflowCompletedAsync(
+            CancellationToken cancellationToken = default);
 }
 
 public sealed record WorkflowNotificationDispatchResult(

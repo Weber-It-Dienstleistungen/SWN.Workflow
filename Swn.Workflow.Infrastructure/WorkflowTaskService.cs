@@ -211,6 +211,14 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         await QueueTaskAvailableNotificationsAsync(
             newlyOpenedTaskInstanceIds,
             cancellationToken);
+
+        if (workflow.Status ==
+            WorkflowStatus.Completed)
+        {
+            await QueueWorkflowCompletedNotificationAsync(
+                workflow.Id,
+                cancellationToken);
+        }
     }
 
     public async Task CompleteDecisionAsync(
@@ -398,6 +406,14 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
         await QueueTaskAvailableNotificationsAsync(
             newlyOpenedTaskInstanceIds,
             cancellationToken);
+
+        if (workflow.Status ==
+            WorkflowStatus.Completed)
+        {
+            await QueueWorkflowCompletedNotificationAsync(
+                workflow.Id,
+                cancellationToken);
+        }
     }
 
     public async Task UpdateCommentAsync(
@@ -1111,6 +1127,38 @@ public sealed class WorkflowTaskService : IWorkflowTaskService
                     "but its notification could not be queued.",
                     taskInstanceId);
             }
+        }
+    }
+
+    private async Task QueueWorkflowCompletedNotificationAsync(
+        Guid workflowInstanceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result =
+                await _workflowNotificationService
+                    .QueueWorkflowCompletedAsync(
+                        workflowInstanceId,
+                        cancellationToken);
+
+            _logger.LogInformation(
+                "Workflow completion notification queued. " +
+                "Workflow: {WorkflowInstanceId}, created: {CreatedCount}, " +
+                "already queued: {AlreadyQueuedCount}, " +
+                "skipped recipients: {SkippedRecipientCount}.",
+                workflowInstanceId,
+                result.CreatedCount,
+                result.AlreadyQueuedCount,
+                result.SkippedRecipientCount);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Workflow {WorkflowInstanceId} was completed, " +
+                "but its completion notification could not be queued.",
+                workflowInstanceId);
         }
     }
 

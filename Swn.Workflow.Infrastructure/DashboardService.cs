@@ -6,14 +6,17 @@ namespace Swn.Workflow.Infrastructure;
 
 public sealed class DashboardService : IDashboardService
 {
-    private readonly IDbContextFactory<WorkflowDbContext> _dbContextFactory;
+    private readonly IDbContextFactory<WorkflowDbContext>
+        _dbContextFactory;
 
     public DashboardService(
         IDbContextFactory<WorkflowDbContext> dbContextFactory)
     {
-        ArgumentNullException.ThrowIfNull(dbContextFactory);
+        ArgumentNullException.ThrowIfNull(
+            dbContextFactory);
 
-        _dbContextFactory = dbContextFactory;
+        _dbContextFactory =
+            dbContextFactory;
     }
 
     public async Task<IReadOnlyList<WorkflowOverviewItem>>
@@ -21,69 +24,169 @@ public sealed class DashboardService : IDashboardService
             string userId,
             CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(userId);
-
         var normalizedUserId =
-            userId.Trim();
-
-        if (string.IsNullOrWhiteSpace(normalizedUserId))
-        {
-            throw new ArgumentException(
-                "User ID must not be empty.",
-                nameof(userId));
-        }
+            NormalizeUserId(
+                userId);
 
         await using var db =
-            await _dbContextFactory.CreateDbContextAsync(
-                cancellationToken);
+            await _dbContextFactory
+                .CreateDbContextAsync(
+                    cancellationToken);
 
-        var items = await (
-            from instance in db.WorkflowInstances.AsNoTracking()
+        var items =
+            await (
+                from instance
+                    in db.WorkflowInstances.AsNoTracking()
 
-            join version in db.WorkflowVersions.AsNoTracking()
-                on instance.WorkflowVersionId equals version.Id
+                join version
+                    in db.WorkflowVersions.AsNoTracking()
+                    on instance.WorkflowVersionId
+                    equals version.Id
 
-            join definition in db.WorkflowDefinitions.AsNoTracking()
-                on version.WorkflowDefinitionId equals definition.Id
+                join definition
+                    in db.WorkflowDefinitions.AsNoTracking()
+                    on version.WorkflowDefinitionId
+                    equals definition.Id
 
-            where
-                instance.CreatedByUserId == normalizedUserId
-                &&
-                (
-                    instance.Status == WorkflowStatus.Open
-                    ||
-                    instance.Status == WorkflowStatus.InProgress
-                )
+                where
+                    instance.CreatedByUserId ==
+                        normalizedUserId
+                    &&
+                    (
+                        instance.Status ==
+                            WorkflowStatus.Open
+                        ||
+                        instance.Status ==
+                            WorkflowStatus.InProgress
+                    )
 
-            orderby instance.CreatedAt descending
+                orderby
+                    instance.CreatedAt descending
 
-            select new
-            {
-                instance.Id,
-                WorkflowName = definition.Name,
-                instance.Subject,
-                instance.ReferenceDate,
-                instance.Status,
+                select new
+                {
+                    instance.Id,
 
-                TotalTasks = db.TaskInstances.Count(
-                    task =>
-                        task.WorkflowInstanceId ==
-                        instance.Id),
+                    WorkflowName =
+                        definition.Name,
 
-                CompletedTasks = db.TaskInstances.Count(
-                    task =>
-                        task.WorkflowInstanceId ==
-                            instance.Id
-                        &&
-                        (
-                            task.Status ==
-                                WorkflowTaskStatus.Completed
-                            ||
-                            task.Status ==
-                                WorkflowTaskStatus.NotRequired
-                        ))
-            })
-            .ToListAsync(cancellationToken);
+                    instance.Subject,
+
+                    instance.ReferenceDate,
+
+                    instance.Status,
+
+                    TotalTasks =
+                        db.TaskInstances.Count(
+                            task =>
+                                task.WorkflowInstanceId ==
+                                instance.Id),
+
+                    CompletedTasks =
+                        db.TaskInstances.Count(
+                            task =>
+                                task.WorkflowInstanceId ==
+                                    instance.Id
+                                &&
+                                (
+                                    task.Status ==
+                                        WorkflowTaskStatus.Completed
+                                    ||
+                                    task.Status ==
+                                        WorkflowTaskStatus.NotRequired
+                                ))
+                })
+                .ToListAsync(
+                    cancellationToken);
+
+        return items
+            .Select(item =>
+                new WorkflowOverviewItem(
+                    item.Id,
+                    item.WorkflowName,
+                    item.Subject,
+                    item.ReferenceDate,
+                    (int)item.Status,
+                    item.TotalTasks,
+                    item.CompletedTasks))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<WorkflowOverviewItem>>
+        GetCompletedWorkflowsForUserAsync(
+            string userId,
+            CancellationToken cancellationToken = default)
+    {
+        var normalizedUserId =
+            NormalizeUserId(
+                userId);
+
+        await using var db =
+            await _dbContextFactory
+                .CreateDbContextAsync(
+                    cancellationToken);
+
+        var items =
+            await (
+                from instance
+                    in db.WorkflowInstances.AsNoTracking()
+
+                join version
+                    in db.WorkflowVersions.AsNoTracking()
+                    on instance.WorkflowVersionId
+                    equals version.Id
+
+                join definition
+                    in db.WorkflowDefinitions.AsNoTracking()
+                    on version.WorkflowDefinitionId
+                    equals definition.Id
+
+                where
+                    instance.CreatedByUserId ==
+                        normalizedUserId
+                    &&
+                    instance.Status ==
+                        WorkflowStatus.Completed
+
+                orderby
+                    instance.CompletedAt descending,
+                    instance.CreatedAt descending
+
+                select new
+                {
+                    instance.Id,
+
+                    WorkflowName =
+                        definition.Name,
+
+                    instance.Subject,
+
+                    instance.ReferenceDate,
+
+                    instance.Status,
+
+                    TotalTasks =
+                        db.TaskInstances.Count(
+                            task =>
+                                task.WorkflowInstanceId ==
+                                instance.Id),
+
+                    CompletedTasks =
+                        db.TaskInstances.Count(
+                            task =>
+                                task.WorkflowInstanceId ==
+                                    instance.Id
+                                &&
+                                (
+                                    task.Status ==
+                                        WorkflowTaskStatus.Completed
+                                    ||
+                                    task.Status ==
+                                        WorkflowTaskStatus.NotRequired
+                                ))
+                })
+                .ToListAsync(
+                    cancellationToken);
 
         return items
             .Select(item =>
@@ -103,8 +206,9 @@ public sealed class DashboardService : IDashboardService
             CancellationToken cancellationToken = default)
     {
         await using var db =
-            await _dbContextFactory.CreateDbContextAsync(
-                cancellationToken);
+            await _dbContextFactory
+                .CreateDbContextAsync(
+                    cancellationToken);
 
         return await db.WorkflowDefinitions
             .AsNoTracking()
@@ -124,6 +228,27 @@ public sealed class DashboardService : IDashboardService
                     definition.Key,
                     definition.Name,
                     definition.Description))
-            .ToListAsync(cancellationToken);
+            .ToListAsync(
+                cancellationToken);
+    }
+
+    private static string NormalizeUserId(
+        string userId)
+    {
+        ArgumentNullException.ThrowIfNull(
+            userId);
+
+        var normalizedUserId =
+            userId.Trim();
+
+        if (string.IsNullOrWhiteSpace(
+            normalizedUserId))
+        {
+            throw new ArgumentException(
+                "User ID must not be empty.",
+                nameof(userId));
+        }
+
+        return normalizedUserId;
     }
 }

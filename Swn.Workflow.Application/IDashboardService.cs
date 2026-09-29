@@ -7,6 +7,11 @@ public interface IDashboardService
             string userId,
             CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<WorkflowOverviewItem>>
+        GetCompletedWorkflowsForUserAsync(
+            string userId,
+            CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AvailableWorkflowItem>>
         GetAvailableWorkflowsAsync(
             CancellationToken cancellationToken = default);
