@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
@@ -74,6 +75,65 @@ public sealed class EmailConfigurationService
             configuration.Username,
             !string.IsNullOrWhiteSpace(
                 configuration.EncryptedPassword),
+            configuration.SmtpHost,
+            configuration.SmtpPort,
+            configuration.SmtpSecurity,
+            configuration.EwsMailboxAddress,
+            configuration.UseAutodiscover,
+            configuration.EwsServiceUrl);
+    }
+
+    public async Task<EmailRuntimeConfiguration?>
+        GetRuntimeAsync(
+            CancellationToken cancellationToken = default)
+    {
+        await using var db =
+            await _dbContextFactory
+                .CreateDbContextAsync(
+                    cancellationToken);
+
+        var configuration =
+            await db.EmailConfigurations
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    item =>
+                        item.Id ==
+                        ConfigurationId,
+                    cancellationToken);
+
+        if (configuration is null)
+        {
+            return null;
+        }
+
+        var password =
+            string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(
+            configuration.EncryptedPassword))
+        {
+            try
+            {
+                password =
+                    _passwordProtector.Unprotect(
+                        configuration.EncryptedPassword);
+            }
+            catch (CryptographicException exception)
+            {
+                throw new InvalidOperationException(
+                    "Das gespeicherte E-Mail-Passwort konnte " +
+                    "nicht entschlüsselt werden.",
+                    exception);
+            }
+        }
+
+        return new EmailRuntimeConfiguration(
+            configuration.Enabled,
+            configuration.Transport,
+            configuration.SenderAddress,
+            configuration.SenderName,
+            configuration.Username,
+            password,
             configuration.SmtpHost,
             configuration.SmtpPort,
             configuration.SmtpSecurity,

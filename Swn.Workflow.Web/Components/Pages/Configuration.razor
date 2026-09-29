@@ -7,6 +7,7 @@
 @attribute [Authorize(Roles = "USER_ADMIN")]
 
 @inject IEmailConfigurationService EmailConfigurationService
+@inject IExchangeEwsConnectionTester ExchangeEwsConnectionTester
 
 <PageTitle>Konfiguration</PageTitle>
 
@@ -226,6 +227,55 @@
                                     </div>
                                 }
 
+                                <hr class="my-4" />
+
+                                <div class="fw-semibold mb-2">
+                                    Verbindungstest
+                                </div>
+
+                                <div class="text-secondary small mb-3">
+                                    Der Test verwendet ausschließlich
+                                    die zuletzt gespeicherte Konfiguration.
+                                    Änderungen deshalb zuerst speichern.
+                                    Es wird keine E-Mail versendet.
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(
+                                    _exchangeTestSuccessMessage))
+                                {
+                                    <div class="alert alert-success">
+                                        @_exchangeTestSuccessMessage
+                                    </div>
+                                }
+
+                                @if (!string.IsNullOrWhiteSpace(
+                                    _exchangeTestErrorMessage))
+                                {
+                                    <div class="alert alert-danger">
+                                        @_exchangeTestErrorMessage
+                                    </div>
+                                }
+
+                                <button type="button"
+                                        class="btn btn-outline-primary"
+                                        disabled="@(_isTestingExchange || _isSaving)"
+                                        @onclick="TestExchangeAsync">
+
+                                    @if (_isTestingExchange)
+                                    {
+                                        <span>
+                                            Exchange-Verbindung wird geprüft...
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span>
+                                            Exchange-Verbindung testen
+                                        </span>
+                                    }
+
+                                </button>
+
                             </div>
 
                         </div>
@@ -390,7 +440,7 @@
 
                     <button type="submit"
                             class="btn btn-primary"
-                            disabled="@_isSaving">
+                            disabled="@(_isSaving || _isTestingExchange)">
 
                         @if (_isSaving)
                         {
@@ -425,6 +475,8 @@
 
     private bool _isSaving;
 
+    private bool _isTestingExchange;
+
     private bool _hasPassword;
 
     private string? _loadErrorMessage;
@@ -432,6 +484,10 @@
     private string? _successMessage;
 
     private string? _errorMessage;
+
+    private string? _exchangeTestSuccessMessage;
+
+    private string? _exchangeTestErrorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -512,6 +568,12 @@
         _errorMessage =
             null;
 
+        _exchangeTestSuccessMessage =
+            null;
+
+        _exchangeTestErrorMessage =
+            null;
+
         try
         {
             var request =
@@ -560,6 +622,56 @@
         finally
         {
             _isSaving =
+                false;
+        }
+    }
+
+    private async Task TestExchangeAsync()
+    {
+        _isTestingExchange =
+            true;
+
+        _exchangeTestSuccessMessage =
+            null;
+
+        _exchangeTestErrorMessage =
+            null;
+
+        try
+        {
+            var result =
+                await ExchangeEwsConnectionTester
+                    .TestAsync();
+
+            var endpointText =
+                string.IsNullOrWhiteSpace(
+                    result.EwsServiceUrl)
+                    ? string.Empty
+                    : $" EWS-Endpunkt: {result.EwsServiceUrl}";
+
+            if (result.Succeeded)
+            {
+                _exchangeTestSuccessMessage =
+                    result.Message +
+                    endpointText;
+            }
+            else
+            {
+                _exchangeTestErrorMessage =
+                    result.Message +
+                    endpointText;
+            }
+        }
+        catch (Exception exception)
+        {
+            _exchangeTestErrorMessage =
+                "Der Exchange-Verbindungstest konnte " +
+                "nicht abgeschlossen werden: " +
+                exception.Message;
+        }
+        finally
+        {
+            _isTestingExchange =
                 false;
         }
     }

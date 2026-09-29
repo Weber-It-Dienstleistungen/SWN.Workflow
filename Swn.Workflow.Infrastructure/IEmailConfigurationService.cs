@@ -6,6 +6,10 @@ public interface IEmailConfigurationService
         GetAsync(
             CancellationToken cancellationToken = default);
 
+    Task<EmailRuntimeConfiguration?>
+        GetRuntimeAsync(
+            CancellationToken cancellationToken = default);
+
     Task<EmailConfigurationOperationResult>
         SaveAsync(
             SaveEmailConfigurationRequest request,
@@ -19,6 +23,20 @@ public sealed record EmailConfigurationView(
     string SenderName,
     string Username,
     bool HasPassword,
+    string SmtpHost,
+    int SmtpPort,
+    SmtpSecurityMode SmtpSecurity,
+    string EwsMailboxAddress,
+    bool UseAutodiscover,
+    string EwsServiceUrl);
+
+public sealed record EmailRuntimeConfiguration(
+    bool Enabled,
+    EmailTransportMode Transport,
+    string SenderAddress,
+    string SenderName,
+    string Username,
+    string Password,
     string SmtpHost,
     int SmtpPort,
     SmtpSecurityMode SmtpSecurity,
