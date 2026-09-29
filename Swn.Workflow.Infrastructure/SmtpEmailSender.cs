@@ -7,17 +7,17 @@ namespace Swn.Workflow.Infrastructure;
 public sealed class SmtpEmailSender
     : IEmailSender
 {
-    private readonly SmtpSettings
-        _settings;
+    private readonly IEmailConfigurationService
+        _configurationService;
 
     public SmtpEmailSender(
-        SmtpSettings settings)
+        IEmailConfigurationService configurationService)
     {
         ArgumentNullException.ThrowIfNull(
-            settings);
+            configurationService);
 
-        _settings =
-            settings;
+        _configurationService =
+            configurationService;
     }
 
     public async Task SendAsync(
@@ -27,41 +27,30 @@ public sealed class SmtpEmailSender
         ArgumentNullException.ThrowIfNull(
             message);
 
-        ValidateConfiguration();
+        ValidateMessage(
+            message);
 
-        if (string.IsNullOrWhiteSpace(
-            message.RecipientAddress))
+        var configuration =
+            await _configurationService
+                .GetRuntimeAsync(
+                    cancellationToken);
+
+        if (configuration is null)
         {
-            throw new ArgumentException(
-                "Die Empfängeradresse darf nicht leer sein.",
-                nameof(message));
+            throw new InvalidOperationException(
+                "Es ist noch keine E-Mail-Konfiguration gespeichert.");
         }
 
-        if (string.IsNullOrWhiteSpace(
-            message.Subject))
-        {
-            throw new ArgumentException(
-                "Der Betreff darf nicht leer sein.",
-                nameof(message));
-        }
-
-        if (string.IsNullOrWhiteSpace(
-                message.TextBody) &&
-            string.IsNullOrWhiteSpace(
-                message.HtmlBody))
-        {
-            throw new ArgumentException(
-                "Die Nachricht muss einen Text- oder HTML-Inhalt enthalten.",
-                nameof(message));
-        }
+        ValidateConfiguration(
+            configuration);
 
         var mimeMessage =
             new MimeMessage();
 
         mimeMessage.From.Add(
             new MailboxAddress(
-                _settings.FromName,
-                _settings.FromAddress));
+                configuration.SenderName,
+                configuration.SenderAddress));
 
         mimeMessage.To.Add(
             new MailboxAddress(
@@ -95,17 +84,18 @@ public sealed class SmtpEmailSender
             new MailKit.Net.Smtp.SmtpClient();
 
         await smtpClient.ConnectAsync(
-            _settings.Host,
-            _settings.Port,
-            GetSecureSocketOptions(),
+            configuration.SmtpHost,
+            configuration.SmtpPort,
+            GetSecureSocketOptions(
+                configuration.SmtpSecurity),
             cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(
-            _settings.Username))
+            configuration.Username))
         {
             await smtpClient.AuthenticateAsync(
-                _settings.Username,
-                _settings.Password,
+                configuration.Username,
+                configuration.Password,
                 cancellationToken);
         }
 
@@ -118,48 +108,92 @@ public sealed class SmtpEmailSender
             cancellationToken);
     }
 
-    private void ValidateConfiguration()
+    private static void ValidateMessage(
+        EmailMessage message)
     {
-        if (!_settings.Enabled)
+        if (string.IsNullOrWhiteSpace(
+            message.RecipientAddress))
+        {
+            throw new ArgumentException(
+                "Die Empfängeradresse darf nicht leer sein.",
+                nameof(message));
+        }
+
+        if (string.IsNullOrWhiteSpace(
+            message.Subject))
+        {
+            throw new ArgumentException(
+                "Der Betreff darf nicht leer sein.",
+                nameof(message));
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                message.TextBody) &&
+            string.IsNullOrWhiteSpace(
+                message.HtmlBody))
+        {
+            throw new ArgumentException(
+                "Die Nachricht muss einen Text- oder " +
+                "HTML-Inhalt enthalten.",
+                nameof(message));
+        }
+    }
+
+    private static void ValidateConfiguration(
+        EmailRuntimeConfiguration configuration)
+    {
+        if (!configuration.Enabled)
         {
             throw new InvalidOperationException(
                 "Der E-Mail-Versand ist nicht aktiviert.");
         }
 
-        if (string.IsNullOrWhiteSpace(
-            _settings.Host))
+        if (configuration.Transport !=
+            EmailTransportMode.Smtp)
         {
             throw new InvalidOperationException(
-                "Für den E-Mail-Versand ist kein SMTP-Server konfiguriert.");
+                "Die gespeicherte Versandart ist nicht SMTP.");
         }
 
-        if (_settings.Port <= 0 ||
-            _settings.Port > 65535)
+        if (string.IsNullOrWhiteSpace(
+            configuration.SmtpHost))
+        {
+            throw new InvalidOperationException(
+                "Für den E-Mail-Versand ist kein " +
+                "SMTP-Server konfiguriert.");
+        }
+
+        if (configuration.SmtpPort <= 0 ||
+            configuration.SmtpPort > 65535)
         {
             throw new InvalidOperationException(
                 "Der konfigurierte SMTP-Port ist ungültig.");
         }
 
         if (string.IsNullOrWhiteSpace(
-            _settings.FromAddress))
+            configuration.SenderAddress))
         {
             throw new InvalidOperationException(
-                "Für den E-Mail-Versand ist keine Absenderadresse konfiguriert.");
+                "Für den E-Mail-Versand ist keine " +
+                "Absenderadresse konfiguriert.");
         }
 
         if (!string.IsNullOrWhiteSpace(
-                _settings.Username) &&
+                configuration.Username) &&
             string.IsNullOrWhiteSpace(
-                _settings.Password))
+                configuration.Password))
         {
             throw new InvalidOperationException(
-                "Für den SMTP-Benutzernamen wurde kein Passwort konfiguriert.");
+                "Für den SMTP-Benutzernamen wurde kein " +
+                "Passwort konfiguriert.");
         }
     }
 
-    private SecureSocketOptions GetSecureSocketOptions()
+    private static SecureSocketOptions
+        GetSecureSocketOptions(
+            SmtpSecurityMode security)
     {
-        return _settings.Security switch
+        return security switch
         {
             SmtpSecurityMode.None =>
                 SecureSocketOptions.None,
@@ -172,7 +206,8 @@ public sealed class SmtpEmailSender
 
             _ =>
                 throw new InvalidOperationException(
-                    "Der konfigurierte SMTP-Sicherheitsmodus ist ungültig.")
+                    "Der konfigurierte SMTP-Sicherheitsmodus " +
+                    "ist ungültig.")
         };
     }
 }

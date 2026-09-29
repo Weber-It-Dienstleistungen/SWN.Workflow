@@ -25,19 +25,13 @@ builder.Services.AddScoped<IUserDirectoryService, UserDirectoryService>();
 builder.Services.AddScoped<IUserAdministrationService, UserAdministrationService>();
 builder.Services.AddScoped<IWorkflowNotificationService, WorkflowNotificationService>();
 builder.Services.AddScoped<IWorkflowNotificationDispatcher, WorkflowNotificationDispatcher>();
+
 builder.Services.AddScoped<IEmailConfigurationService, EmailConfigurationService>();
 builder.Services.AddScoped<IExchangeEwsConnectionTester, ExchangeEwsConnectionTester>();
+
+builder.Services.AddScoped<SmtpEmailSender>();
 builder.Services.AddScoped<ExchangeEwsEmailSender>();
-builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
-
-var smtpSettings =
-    builder.Configuration
-        .GetSection("Smtp")
-        .Get<SmtpSettings>()
-    ?? new SmtpSettings();
-
-builder.Services.AddSingleton(
-    smtpSettings);
+builder.Services.AddScoped<IEmailSender, ConfiguredEmailSender>();
 
 var connectionString = builder.Configuration
     .GetConnectionString("WorkflowDatabase")
