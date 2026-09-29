@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Swn.Workflow.Application;
 using Swn.Workflow.Infrastructure;
 using Swn.Workflow.Web.Components;
+using Swn.Workflow.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +33,8 @@ builder.Services.AddScoped<IExchangeEwsConnectionTester, ExchangeEwsConnectionTe
 builder.Services.AddScoped<SmtpEmailSender>();
 builder.Services.AddScoped<ExchangeEwsEmailSender>();
 builder.Services.AddScoped<IEmailSender, ConfiguredEmailSender>();
+
+builder.Services.AddHostedService<WorkflowNotificationBackgroundService>();
 
 var connectionString = builder.Configuration
     .GetConnectionString("WorkflowDatabase")
