@@ -52,6 +52,9 @@ public class WorkflowDbContext
     public DbSet<WorkflowNotification> WorkflowNotifications =>
         Set<WorkflowNotification>();
 
+    public DbSet<SmtpConfiguration> SmtpConfigurations =>
+        Set<SmtpConfiguration>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -65,6 +68,38 @@ public class WorkflowDbContext
             entity.Property(x => x.IsActive)
                 .IsRequired()
                 .HasDefaultValue(true);
+        });
+
+        modelBuilder.Entity<SmtpConfiguration>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Host)
+                .IsRequired()
+                .HasMaxLength(255);
+
+            entity.Property(x => x.FromAddress)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.Property(x => x.FromName)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            entity.Property(x => x.Username)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.Property(x => x.EncryptedPassword);
+
+            entity.Property(x => x.Port)
+                .IsRequired();
+
+            entity.Property(x => x.Security)
+                .IsRequired();
+
+            entity.Property(x => x.Enabled)
+                .IsRequired();
         });
 
         modelBuilder.Entity<WorkflowDefinition>(entity =>
