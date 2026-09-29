@@ -1,0 +1,639 @@
+﻿@page "/admin/configuration"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using Swn.Workflow.Infrastructure
+
+@attribute [Authorize(Roles = "USER_ADMIN")]
+
+@inject IEmailConfigurationService EmailConfigurationService
+
+<PageTitle>Konfiguration</PageTitle>
+
+<div class="container-fluid px-0">
+
+    <div class="mb-4">
+        <div class="text-secondary small mb-1">
+            Administration
+        </div>
+
+        <h1 class="display-6 fw-semibold mb-2">
+            Konfiguration
+        </h1>
+
+        <p class="text-secondary mb-0">
+            Technische Einstellungen des SWN Workflow-Systems verwalten.
+        </p>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-secondary">
+            Konfiguration wird geladen...
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(
+        _loadErrorMessage))
+    {
+        <div class="alert alert-danger">
+            @_loadErrorMessage
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+
+            <div class="card-header bg-body fw-semibold">
+                E-Mail-Versand
+            </div>
+
+            <div class="card-body">
+
+                <p class="text-secondary">
+                    Der E-Mail-Versand kann über Exchange Web Services
+                    oder über einen klassischen SMTP-Server erfolgen.
+                    Zugangspasswörter werden verschlüsselt gespeichert
+                    und nach dem Speichern nicht mehr angezeigt.
+                </p>
+
+                @if (!string.IsNullOrWhiteSpace(
+                    _successMessage))
+                {
+                    <div class="alert alert-success">
+                        @_successMessage
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(
+                    _errorMessage))
+                {
+                    <div class="alert alert-danger">
+                        @_errorMessage
+                    </div>
+                }
+
+                <EditForm Model="_model"
+                          OnValidSubmit="SaveAsync">
+
+                    <DataAnnotationsValidator />
+
+                    <ValidationSummary />
+
+                    <div class="form-check form-switch mb-4">
+
+                        <InputCheckbox id="emailEnabled"
+                                       class="form-check-input"
+                                       @bind-Value="_model.Enabled" />
+
+                        <label class="form-check-label fw-semibold"
+                               for="emailEnabled">
+                            E-Mail-Versand aktivieren
+                        </label>
+
+                    </div>
+
+                    <div class="mb-4">
+
+                        <label class="form-label"
+                               for="transport">
+                            Versandart
+                        </label>
+
+                        <InputSelect id="transport"
+                                     class="form-select"
+                                     @bind-Value="_model.Transport">
+
+                            <option value="@EmailTransportMode.ExchangeEws">
+                                Exchange (EWS)
+                            </option>
+
+                            <option value="@EmailTransportMode.Smtp">
+                                SMTP
+                            </option>
+
+                        </InputSelect>
+
+                    </div>
+
+                    <hr class="my-4" />
+
+                    <div class="row">
+
+                        <div class="col-lg-6 mb-3">
+
+                            <label class="form-label"
+                                   for="senderAddress">
+                                Absenderadresse
+                            </label>
+
+                            <InputText id="senderAddress"
+                                       class="form-control"
+                                       type="email"
+                                       autocomplete="off"
+                                       @bind-Value="_model.SenderAddress" />
+
+                            <ValidationMessage For="@(() => _model.SenderAddress)" />
+
+                            <div class="form-text">
+                                Beispielsweise
+                                workflow.swn@swn-nec.de
+                            </div>
+
+                        </div>
+
+                        <div class="col-lg-6 mb-3">
+
+                            <label class="form-label"
+                                   for="senderName">
+                                Absendername
+                            </label>
+
+                            <InputText id="senderName"
+                                       class="form-control"
+                                       autocomplete="off"
+                                       @bind-Value="_model.SenderName" />
+
+                            <ValidationMessage For="@(() => _model.SenderName)" />
+
+                        </div>
+
+                    </div>
+
+                    @if (_model.Transport ==
+                        EmailTransportMode.ExchangeEws)
+                    {
+                        <div class="card bg-body-tertiary mb-4">
+
+                            <div class="card-header fw-semibold">
+                                Exchange Web Services
+                            </div>
+
+                            <div class="card-body">
+
+                                <div class="mb-3">
+
+                                    <label class="form-label"
+                                           for="ewsMailboxAddress">
+                                        Exchange-Postfach
+                                    </label>
+
+                                    <InputText id="ewsMailboxAddress"
+                                               class="form-control"
+                                               type="email"
+                                               autocomplete="off"
+                                               @bind-Value="_model.EwsMailboxAddress" />
+
+                                    <ValidationMessage For="@(() => _model.EwsMailboxAddress)" />
+
+                                    <div class="form-text">
+                                        Diese Adresse wird für
+                                        Autodiscover und die Zuordnung
+                                        des Exchange-Postfachs verwendet.
+                                    </div>
+
+                                </div>
+
+                                <div class="form-check form-switch mb-3">
+
+                                    <InputCheckbox id="useAutodiscover"
+                                                   class="form-check-input"
+                                                   @bind-Value="_model.UseAutodiscover" />
+
+                                    <label class="form-check-label"
+                                           for="useAutodiscover">
+                                        Autodiscover verwenden
+                                    </label>
+
+                                </div>
+
+                                @if (!_model.UseAutodiscover)
+                                {
+                                    <div class="mb-3">
+
+                                        <label class="form-label"
+                                               for="ewsServiceUrl">
+                                            EWS-Endpunkt
+                                        </label>
+
+                                        <InputText id="ewsServiceUrl"
+                                                   class="form-control"
+                                                   autocomplete="off"
+                                                   placeholder="https://server/EWS/Exchange.asmx"
+                                                   @bind-Value="_model.EwsServiceUrl" />
+
+                                        <ValidationMessage For="@(() => _model.EwsServiceUrl)" />
+
+                                    </div>
+                                }
+
+                            </div>
+
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="card bg-body-tertiary mb-4">
+
+                            <div class="card-header fw-semibold">
+                                SMTP
+                            </div>
+
+                            <div class="card-body">
+
+                                <div class="row">
+
+                                    <div class="col-lg-8 mb-3">
+
+                                        <label class="form-label"
+                                               for="smtpHost">
+                                            SMTP-Server
+                                        </label>
+
+                                        <InputText id="smtpHost"
+                                                   class="form-control"
+                                                   autocomplete="off"
+                                                   @bind-Value="_model.SmtpHost" />
+
+                                        <ValidationMessage For="@(() => _model.SmtpHost)" />
+
+                                    </div>
+
+                                    <div class="col-lg-4 mb-3">
+
+                                        <label class="form-label"
+                                               for="smtpPort">
+                                            Port
+                                        </label>
+
+                                        <InputNumber id="smtpPort"
+                                                     class="form-control"
+                                                     @bind-Value="_model.SmtpPort" />
+
+                                        <ValidationMessage For="@(() => _model.SmtpPort)" />
+
+                                    </div>
+
+                                </div>
+
+                                <div class="mb-3">
+
+                                    <label class="form-label"
+                                           for="smtpSecurity">
+                                        Verbindungssicherheit
+                                    </label>
+
+                                    <InputSelect id="smtpSecurity"
+                                                 class="form-select"
+                                                 @bind-Value="_model.SmtpSecurity">
+
+                                        <option value="@SmtpSecurityMode.None">
+                                            Keine Verschlüsselung
+                                        </option>
+
+                                        <option value="@SmtpSecurityMode.StartTls">
+                                            STARTTLS
+                                        </option>
+
+                                        <option value="@SmtpSecurityMode.SslOnConnect">
+                                            SSL/TLS beim Verbindungsaufbau
+                                        </option>
+
+                                    </InputSelect>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+                    }
+
+                    <div class="card bg-body-tertiary mb-4">
+
+                        <div class="card-header fw-semibold">
+                            Authentifizierung
+                        </div>
+
+                        <div class="card-body">
+
+                            <div class="mb-3">
+
+                                <label class="form-label"
+                                       for="username">
+                                    Benutzername
+                                </label>
+
+                                <InputText id="username"
+                                           class="form-control"
+                                           autocomplete="off"
+                                           @bind-Value="_model.Username" />
+
+                                <ValidationMessage For="@(() => _model.Username)" />
+
+                                @if (_model.Transport ==
+                                    EmailTransportMode.ExchangeEws)
+                                {
+                                    <div class="form-text">
+                                        Je nach Exchange-Konfiguration
+                                        beispielsweise die E-Mail-Adresse
+                                        oder DOMÄNE\Benutzername.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="form-text">
+                                        Bei SMTP-Relay ohne Authentifizierung
+                                        kann dieses Feld leer bleiben.
+                                    </div>
+                                }
+
+                            </div>
+
+                            <div class="mb-3">
+
+                                <label class="form-label"
+                                       for="password">
+                                    Passwort
+                                </label>
+
+                                <InputText id="password"
+                                           class="form-control"
+                                           type="password"
+                                           autocomplete="new-password"
+                                           @bind-Value="_model.Password" />
+
+                                @if (_hasPassword)
+                                {
+                                    <div class="form-text text-success">
+                                        Ein Passwort ist bereits hinterlegt.
+                                        Feld leer lassen, um es beizubehalten.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="form-text">
+                                        Noch kein Passwort hinterlegt.
+                                    </div>
+                                }
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="alert alert-secondary">
+                        Das gespeicherte Passwort kann über diese
+                        Oberfläche nicht wieder ausgelesen werden.
+                        Ein neu eingetragenes Passwort ersetzt
+                        das bisherige.
+                    </div>
+
+                    <button type="submit"
+                            class="btn btn-primary"
+                            disabled="@_isSaving">
+
+                        @if (_isSaving)
+                        {
+                            <span>
+                                Konfiguration wird gespeichert...
+                            </span>
+                        }
+                        else
+                        {
+                            <span>
+                                Konfiguration speichern
+                            </span>
+                        }
+
+                    </button>
+
+                </EditForm>
+
+            </div>
+
+        </div>
+    }
+
+</div>
+
+@code {
+    private EmailConfigurationFormModel _model =
+        new();
+
+    private bool _isLoading =
+        true;
+
+    private bool _isSaving;
+
+    private bool _hasPassword;
+
+    private string? _loadErrorMessage;
+
+    private string? _successMessage;
+
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadAsync();
+        }
+        catch
+        {
+            _loadErrorMessage =
+                "Die E-Mail-Konfiguration konnte nicht geladen werden.";
+        }
+        finally
+        {
+            _isLoading =
+                false;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var configuration =
+            await EmailConfigurationService
+                .GetAsync();
+
+        _model =
+            new EmailConfigurationFormModel
+            {
+                Enabled =
+                    configuration.Enabled,
+
+                Transport =
+                    configuration.Transport,
+
+                SenderAddress =
+                    configuration.SenderAddress,
+
+                SenderName =
+                    configuration.SenderName,
+
+                Username =
+                    configuration.Username,
+
+                Password =
+                    string.Empty,
+
+                SmtpHost =
+                    configuration.SmtpHost,
+
+                SmtpPort =
+                    configuration.SmtpPort,
+
+                SmtpSecurity =
+                    configuration.SmtpSecurity,
+
+                EwsMailboxAddress =
+                    configuration.EwsMailboxAddress,
+
+                UseAutodiscover =
+                    configuration.UseAutodiscover,
+
+                EwsServiceUrl =
+                    configuration.EwsServiceUrl
+            };
+
+        _hasPassword =
+            configuration.HasPassword;
+    }
+
+    private async Task SaveAsync()
+    {
+        _isSaving =
+            true;
+
+        _successMessage =
+            null;
+
+        _errorMessage =
+            null;
+
+        try
+        {
+            var request =
+                new SaveEmailConfigurationRequest(
+                    _model.Enabled,
+                    _model.Transport,
+                    _model.SenderAddress,
+                    _model.SenderName,
+                    _model.Username,
+                    string.IsNullOrEmpty(
+                        _model.Password)
+                        ? null
+                        : _model.Password,
+                    _model.SmtpHost,
+                    _model.SmtpPort,
+                    _model.SmtpSecurity,
+                    _model.EwsMailboxAddress,
+                    _model.UseAutodiscover,
+                    _model.EwsServiceUrl);
+
+            var result =
+                await EmailConfigurationService
+                    .SaveAsync(
+                        request);
+
+            if (!result.Succeeded)
+            {
+                _errorMessage =
+                    string.Join(
+                        " ",
+                        result.Errors);
+
+                return;
+            }
+
+            await LoadAsync();
+
+            _successMessage =
+                "Die E-Mail-Konfiguration wurde gespeichert.";
+        }
+        catch
+        {
+            _errorMessage =
+                "Die E-Mail-Konfiguration konnte nicht gespeichert werden.";
+        }
+        finally
+        {
+            _isSaving =
+                false;
+        }
+    }
+
+    private sealed class EmailConfigurationFormModel
+    {
+        public bool Enabled { get; set; }
+
+        public EmailTransportMode Transport { get; set; } =
+            EmailTransportMode.ExchangeEws;
+
+        [EmailAddress(
+            ErrorMessage =
+                "Bitte eine gültige Absenderadresse angeben.")]
+        [StringLength(
+            256,
+            ErrorMessage =
+                "Die Absenderadresse darf maximal 256 Zeichen lang sein.")]
+        public string SenderAddress { get; set; } =
+            string.Empty;
+
+        [StringLength(
+            200,
+            ErrorMessage =
+                "Der Absendername darf maximal 200 Zeichen lang sein.")]
+        public string SenderName { get; set; } =
+            "SWN Workflow";
+
+        [StringLength(
+            256,
+            ErrorMessage =
+                "Der Benutzername darf maximal 256 Zeichen lang sein.")]
+        public string Username { get; set; } =
+            string.Empty;
+
+        public string Password { get; set; } =
+            string.Empty;
+
+        [StringLength(
+            255,
+            ErrorMessage =
+                "Der SMTP-Server darf maximal 255 Zeichen lang sein.")]
+        public string SmtpHost { get; set; } =
+            string.Empty;
+
+        [Range(
+            1,
+            65535,
+            ErrorMessage =
+                "Der SMTP-Port muss zwischen 1 und 65535 liegen.")]
+        public int SmtpPort { get; set; } =
+            587;
+
+        public SmtpSecurityMode SmtpSecurity { get; set; } =
+            SmtpSecurityMode.StartTls;
+
+        [EmailAddress(
+            ErrorMessage =
+                "Bitte eine gültige Exchange-Postfachadresse angeben.")]
+        [StringLength(
+            256,
+            ErrorMessage =
+                "Die Exchange-Postfachadresse darf maximal 256 Zeichen lang sein.")]
+        public string EwsMailboxAddress { get; set; } =
+            string.Empty;
+
+        public bool UseAutodiscover { get; set; } =
+            true;
+
+        [StringLength(
+            2000,
+            ErrorMessage =
+                "Der EWS-Endpunkt darf maximal 2000 Zeichen lang sein.")]
+        public string EwsServiceUrl { get; set; } =
+            string.Empty;
+    }
+}

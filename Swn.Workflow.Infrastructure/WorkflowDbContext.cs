@@ -52,8 +52,8 @@ public class WorkflowDbContext
     public DbSet<WorkflowNotification> WorkflowNotifications =>
         Set<WorkflowNotification>();
 
-    public DbSet<SmtpConfiguration> SmtpConfigurations =>
-        Set<SmtpConfiguration>();
+    public DbSet<EmailConfiguration> EmailConfigurations =>
+        Set<EmailConfiguration>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,19 +70,21 @@ public class WorkflowDbContext
                 .HasDefaultValue(true);
         });
 
-        modelBuilder.Entity<SmtpConfiguration>(entity =>
+        modelBuilder.Entity<EmailConfiguration>(entity =>
         {
             entity.HasKey(x => x.Id);
 
-            entity.Property(x => x.Host)
-                .IsRequired()
-                .HasMaxLength(255);
+            entity.Property(x => x.Enabled)
+                .IsRequired();
 
-            entity.Property(x => x.FromAddress)
+            entity.Property(x => x.Transport)
+                .IsRequired();
+
+            entity.Property(x => x.SenderAddress)
                 .IsRequired()
                 .HasMaxLength(256);
 
-            entity.Property(x => x.FromName)
+            entity.Property(x => x.SenderName)
                 .IsRequired()
                 .HasMaxLength(200);
 
@@ -92,14 +94,26 @@ public class WorkflowDbContext
 
             entity.Property(x => x.EncryptedPassword);
 
-            entity.Property(x => x.Port)
+            entity.Property(x => x.SmtpHost)
+                .IsRequired()
+                .HasMaxLength(255);
+
+            entity.Property(x => x.SmtpPort)
                 .IsRequired();
 
-            entity.Property(x => x.Security)
+            entity.Property(x => x.SmtpSecurity)
                 .IsRequired();
 
-            entity.Property(x => x.Enabled)
+            entity.Property(x => x.EwsMailboxAddress)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.Property(x => x.UseAutodiscover)
                 .IsRequired();
+
+            entity.Property(x => x.EwsServiceUrl)
+                .IsRequired()
+                .HasMaxLength(2000);
         });
 
         modelBuilder.Entity<WorkflowDefinition>(entity =>
