@@ -30,7 +30,7 @@ else if (_workflow is null)
     </div>
 
     <a class="btn btn-outline-secondary"
-       href="/">
+       href="">
         Zurück zum Dashboard
     </a>
 }
@@ -38,7 +38,7 @@ else
 {
     <div class="mb-4">
         <a class="text-decoration-none"
-           href="/">
+           href="">
             ← Zurück zum Dashboard
         </a>
     </div>
@@ -155,7 +155,7 @@ else
                     </button>
 
                     <a class="btn btn-outline-secondary"
-                       href="/">
+                       href="">
                         Abbrechen
                     </a>
                 </div>
@@ -247,7 +247,7 @@ else
 
             await WorkflowEngine.StartAsync(request);
 
-            Navigation.NavigateTo("/");
+            Navigation.NavigateTo(Navigation.BaseUri);
         }
         catch
         {

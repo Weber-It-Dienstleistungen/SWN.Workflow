@@ -225,7 +225,7 @@
                                             <a class="btn
                                                 btn-outline-primary"
                                                href="@GetDetailUrl(
-                                                   workflow.Id)">
+                                                                                                  workflow.Id)">
                                                 Vorgang öffnen
                                             </a>
 
@@ -346,13 +346,13 @@
                                             <a class="btn
                                                 btn-outline-secondary"
                                                href="@GetDetailUrl(
-                                                   workflow.Id)">
+                                                                                                  workflow.Id)">
                                                 Vorgang öffnen
                                             </a>
 
                                             <a class="btn btn-primary"
                                                href="@GetPdfUrl(
-                                                   workflow.Id)">
+                                                                                                  workflow.Id)">
                                                 PDF exportieren
                                             </a>
 
@@ -412,7 +412,7 @@
                                                 btn-outline-primary
                                                 w-100"
                                                href="@GetStartUrl(
-                                                   workflow.Key)">
+                                                                                                  workflow.Key)">
                                                 @workflow.Name
                                             </a>
 
@@ -457,7 +457,7 @@
                             <a class="btn
                                 btn-outline-primary
                                 w-100"
-                               href="/tasks">
+                               href="tasks">
                                 Meine Aufgaben öffnen
                             </a>
 
@@ -583,7 +583,7 @@
         string workflowKey)
     {
         return
-            $"/workflow/start/" +
+            $"workflow/start/" +
             Uri.EscapeDataString(
                 workflowKey);
     }
@@ -592,14 +592,14 @@
         Guid workflowInstanceId)
     {
         return
-            $"/workflow/{workflowInstanceId}";
+            $"workflow/{workflowInstanceId}";
     }
 
     private static string GetPdfUrl(
         Guid workflowInstanceId)
     {
         return
-            $"/workflow/{workflowInstanceId}/pdf";
+            $"workflow/{workflowInstanceId}/pdf";
     }
 
     private static int GetProgress(
