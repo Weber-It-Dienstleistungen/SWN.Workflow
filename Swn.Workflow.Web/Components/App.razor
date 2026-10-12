@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="de">
 
 <head>
@@ -6,7 +6,7 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0" />
 
-    <base href="/" />
+    <base href="@AppBaseHref" />
 
     <ResourcePreloader />
 
@@ -42,8 +42,12 @@
 
 @code {
     [CascadingParameter]
-    private HttpContext HttpContext { get; set; } =
-        default!;
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private string AppBaseHref =>
+        HttpContext.Request.PathBase.HasValue
+            ? HttpContext.Request.PathBase.Value + "/"
+            : "/";
 
     private IComponentRenderMode? PageRenderMode =>
         HttpContext.AcceptsInteractiveRouting()

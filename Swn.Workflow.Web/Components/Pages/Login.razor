@@ -1,4 +1,4 @@
-﻿@page "/login"
+@page "/login"
 
 @using Microsoft.AspNetCore.Components
 
@@ -8,35 +8,19 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-8">
-
         <div class="mb-4 text-center">
-            <h1 class="display-6 fw-semibold mb-2">
-                SWN Workflow
-            </h1>
-
-            <p class="text-secondary mb-0">
-                Anmeldung am Workflow-System
-            </p>
+            <h1 class="display-6 fw-semibold mb-2">SWN Workflow</h1>
+            <p class="text-secondary mb-0">Anmeldung am Workflow-System</p>
         </div>
 
         <div class="card shadow-sm">
-            <div class="card-header bg-body fw-semibold">
-                Anmelden
-            </div>
-
+            <div class="card-header bg-body fw-semibold">Anmelden</div>
             <div class="card-body">
-
-                <form method="post"
-                      action="/account/login">
-
+                <form method="post" action="account/login">
                     <AntiforgeryToken />
 
                     <div class="mb-3">
-                        <label class="form-label"
-                               for="userName">
-                            Benutzername
-                        </label>
-
+                        <label class="form-label" for="userName">Benutzername</label>
                         <input id="userName"
                                name="userName"
                                class="form-control"
@@ -45,11 +29,7 @@
                     </div>
 
                     <div class="mb-4">
-                        <label class="form-label"
-                               for="password">
-                            Passwort
-                        </label>
-
+                        <label class="form-label" for="password">Passwort</label>
                         <input id="password"
                                name="password"
                                type="password"
@@ -58,213 +38,11 @@
                                required />
                     </div>
 
-                    <button class="btn btn-primary w-100"
-                            type="submit">
+                    <button class="btn btn-primary w-100" type="submit">
                         Anmelden
                     </button>
-
                 </form>
-
             </div>
         </div>
-
-        <div class="card shadow-sm mt-3">
-            <div class="card-header bg-body fw-semibold">
-                Arbeitsbenutzer
-            </div>
-
-            <div class="card-body">
-
-                <div class="small text-secondary mb-3">
-                    Gemeinsames Initialpasswort:
-                    <strong class="text-body">
-                        Demo1234
-                    </strong>
-                </div>
-
-                <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0">
-
-                        <thead>
-                            <tr>
-                                <th scope="col">
-                                    Organisationseinheit / Funktion
-                                </th>
-
-                                <th scope="col">
-                                    Benutzername
-                                </th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            <tr>
-                                <td>
-                                    Geschäftsführung
-                                </td>
-
-                                <td>
-                                    <code>geschaeftsfuehrung</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    Sekretariat
-                                </td>
-
-                                <td>
-                                    <code>sekretariat</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    Prozess- und Projektsteuerung
-                                </td>
-
-                                <td>
-                                    <code>prozess.projektsteuerung</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    Kaufm. Abteilung – Hauptabteilungsleitung
-                                </td>
-
-                                <td>
-                                    <code>hauptabteilungsleitung.kaufmaennische.abteilung</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    Personalwesen
-                                </td>
-
-                                <td>
-                                    <code>personalwesen</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    Technische Abteilung – Hauptabteilungsleitung
-                                </td>
-
-                                <td>
-                                    <code>hauptabteilungsleitung.technische.abteilung</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    Netz und techn. Anlagen – Abteilungsleitung
-                                </td>
-
-                                <td>
-                                    <code>abteilungsleitung.netz.technische.anlagen</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    Strom – Bereichsleitung
-                                </td>
-
-                                <td>
-                                    <code>bereichsleitung.strom</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    G/W und Wärme – Bereichsleitung
-                                </td>
-
-                                <td>
-                                    <code>bereichsleitung.gw.waerme</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    Informationstechnik
-                                </td>
-
-                                <td>
-                                    <code>informationstechnik</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    Einkauf/Lager
-                                </td>
-
-                                <td>
-                                    <code>einkauf.lager</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    Telenec
-                                </td>
-
-                                <td>
-                                    <code>telenec</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    Telenec – Abteilungsleitung
-                                </td>
-
-                                <td>
-                                    <code>abteilungsleitung.telenec</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    Informationssicherheitsbeauftragter (ext.)
-                                </td>
-
-                                <td>
-                                    <code>informationssicherheitsbeauftragter.ext</code>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    Leitsystem
-
-                                    <div class="small text-warning-emphasis">
-                                        Workflowbegriff – Zuordnung zum Organigramm noch offen
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <code>leitsystem</code>
-                                </td>
-                            </tr>
-                        </tbody>
-
-                    </table>
-                </div>
-
-                <div class="form-text mt-3">
-                    Die Benutzerstruktur orientiert sich an den
-                    Organisationseinheiten und Funktionen des aktuellen
-                    Organigramms. Abweichende Workflowbegriffe werden
-                    bis zur fachlichen Klärung ausdrücklich gekennzeichnet.
-                </div>
-
-            </div>
-        </div>
-
     </div>
 </div>

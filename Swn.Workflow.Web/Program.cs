@@ -1,6 +1,8 @@
+using System.Net;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Swn.Workflow.Application;
@@ -13,8 +15,28 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddDataProtection()
+// Der Schluesselring muss bei einem produktiven Betrieb dauerhaft
+// ausserhalb des Anwendungsverzeichnisses erhalten bleiben.
+var dataProtection = builder.Services.AddDataProtection()
     .SetApplicationName("Swn.Workflow");
+
+if (!builder.Environment.IsDevelopment())
+{
+    var keyDirectory = builder.Configuration[
+        "Workflow:DataProtectionKeysPath"];
+
+    if (string.IsNullOrWhiteSpace(keyDirectory) ||
+        !Path.IsPathFullyQualified(keyDirectory))
+    {
+        throw new InvalidOperationException(
+            "Fuer den produktiven Betrieb muss " +
+            "Workflow:DataProtectionKeysPath auf ein absolutes, " +
+            "dauerhaftes und geschuetztes Verzeichnis zeigen.");
+    }
+
+    dataProtection.PersistKeysToFileSystem(
+        new DirectoryInfo(keyDirectory));
+}
 
 builder.Services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
 
@@ -51,20 +73,72 @@ builder.Services
     {
         options.User.RequireUniqueEmail = false;
 
-        options.Password.RequiredLength = 8;
+        options.Password.RequiredLength = builder.Environment.IsDevelopment() ? 8 : 12;
         options.Password.RequireDigit = true;
         options.Password.RequireLowercase = true;
         options.Password.RequireUppercase = true;
         options.Password.RequireNonAlphanumeric = false;
+
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.AllowedForNewUsers = true;
     })
     .AddEntityFrameworkStores<WorkflowDbContext>()
     .AddDefaultTokenProviders();
 
-builder.Services.AddAuthorization();
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.Name = "Swn.Workflow.Authentication";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
 
+    options.LoginPath = "/login";
+    options.AccessDeniedPath = "/not-found";
+    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    options.SlidingExpiration = false;
+});
+
+// Nur ein Reverse Proxy auf demselben Host darf Forwarded-Header setzen.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto;
+
+    options.KnownProxies.Add(IPAddress.Loopback);
+    options.KnownProxies.Add(IPAddress.IPv6Loopback);
+    options.ForwardLimit = 1;
+});
+
+builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
+
+// Lokal: / ; temporär in Plesk: /workflow ; später wieder / möglich.
+var pathBase = app.Configuration["Workflow:PathBase"]?.Trim();
+
+if (!string.IsNullOrEmpty(pathBase) && pathBase != "/")
+{
+    if (!pathBase.StartsWith('/') ||
+        pathBase.Contains('?') ||
+        pathBase.Contains('#') ||
+        pathBase.Contains("//", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException(
+            "Workflow:PathBase muss ein gueltiger URL-Pfad sein, " +
+            "beispielsweise /workflow.");
+    }
+
+    app.UsePathBase(pathBase.TrimEnd('/'));
+}
+
+app.UseRouting();
 
 if (!app.Environment.IsDevelopment())
 {
@@ -80,7 +154,6 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.UseAntiforgery();
 
 app.MapStaticAssets();
@@ -93,50 +166,42 @@ app.MapPost(
         SignInManager<ApplicationUser> signInManager,
         IAntiforgery antiforgery) =>
     {
-        if (!await antiforgery.IsRequestValidAsync(
-            httpContext))
+        var loginUrl = $"{httpContext.Request.PathBase}/login";
+
+        if (!await antiforgery.IsRequestValidAsync(httpContext))
         {
-            return Results.Redirect("/login");
+            return Results.Redirect(loginUrl);
         }
 
-        var form =
-            await httpContext.Request.ReadFormAsync();
-
-        var userName =
-            form["userName"].ToString().Trim();
-
-        var password =
-            form["password"].ToString();
+        var form = await httpContext.Request.ReadFormAsync();
+        var userName = form["userName"].ToString().Trim();
+        var password = form["password"].ToString();
 
         if (string.IsNullOrWhiteSpace(userName) ||
             string.IsNullOrWhiteSpace(password))
         {
-            return Results.Redirect("/login");
+            return Results.Redirect(loginUrl);
         }
 
-        var user =
-            await userManager.FindByNameAsync(
-                userName);
+        var user = await userManager.FindByNameAsync(userName);
 
-        if (user is null ||
-            !user.IsActive)
+        if (user is null || !user.IsActive)
         {
-            return Results.Redirect("/login");
+            return Results.Redirect(loginUrl);
         }
 
-        var result =
-            await signInManager.PasswordSignInAsync(
-                user,
-                password,
-                isPersistent: false,
-                lockoutOnFailure: false);
+        var result = await signInManager.PasswordSignInAsync(
+            user,
+            password,
+            isPersistent: false,
+            lockoutOnFailure: true);
 
         if (!result.Succeeded)
         {
-            return Results.Redirect("/login");
+            return Results.Redirect(loginUrl);
         }
 
-        return Results.Redirect("/");
+        return Results.Redirect($"{httpContext.Request.PathBase}/");
     });
 
 app.MapPost(
@@ -146,15 +211,14 @@ app.MapPost(
         SignInManager<ApplicationUser> signInManager,
         IAntiforgery antiforgery) =>
     {
-        if (!await antiforgery.IsRequestValidAsync(
-            httpContext))
+        if (!await antiforgery.IsRequestValidAsync(httpContext))
         {
             return Results.BadRequest();
         }
 
         await signInManager.SignOutAsync();
 
-        return Results.Redirect("/login");
+        return Results.Redirect($"{httpContext.Request.PathBase}/login");
     });
 
 app.MapGet(
@@ -165,22 +229,17 @@ app.MapGet(
             IWorkflowPdfExportService pdfExportService,
             CancellationToken cancellationToken) =>
         {
-            var userId =
-                user.FindFirstValue(
-                    ClaimTypes.NameIdentifier);
+            var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
 
-            if (string.IsNullOrWhiteSpace(
-                userId))
+            if (string.IsNullOrWhiteSpace(userId))
             {
                 return Results.Unauthorized();
             }
 
-            var result =
-                await pdfExportService
-                    .CreateForInitiatorAsync(
-                        workflowInstanceId,
-                        userId,
-                        cancellationToken);
+            var result = await pdfExportService.CreateForInitiatorAsync(
+                workflowInstanceId,
+                userId,
+                cancellationToken);
 
             if (result is null)
             {
@@ -202,8 +261,7 @@ using (var scope = app.Services.CreateScope())
     var dbFactory = scope.ServiceProvider
         .GetRequiredService<IDbContextFactory<WorkflowDbContext>>();
 
-    await using var db =
-        await dbFactory.CreateDbContextAsync();
+    await using var db = await dbFactory.CreateDbContextAsync();
 
     if (!await db.Database.CanConnectAsync())
     {
@@ -211,10 +269,9 @@ using (var scope = app.Services.CreateScope())
             "Connection to the workflow database could not be established.");
     }
 
+    // Datenbankschema muss vor dem Start per EF-Migration erstellt sein.
     await WorkflowSeedData.InitializeAsync(dbFactory);
-
     await WorkflowGraphSeedData.InitializeAsync(dbFactory);
-
     await TaskFieldSeedData.InitializeAsync(dbFactory);
 
     var userManager = scope.ServiceProvider
@@ -223,9 +280,119 @@ using (var scope = app.Services.CreateScope())
     var roleManager = scope.ServiceProvider
         .GetRequiredService<RoleManager<IdentityRole>>();
 
-    await IdentitySeedData.InitializeAsync(
-        userManager,
-        roleManager);
+    if (app.Environment.IsDevelopment())
+    {
+        // Bisherige lokale Testkonten ausschliesslich in Development.
+        await IdentitySeedData.InitializeAsync(userManager, roleManager);
+    }
+    else
+    {
+        // In Production werden keine Konten mit Demo1234 angelegt.
+        var roles = new[]
+        {
+            "SUPERVISOR",
+            "HR",
+            "IT",
+            "ORGANIZATION",
+            "TELENEC",
+            "EXECUTIVE_SECRETARIAT",
+            "TECHNICAL_MANAGEMENT",
+            "WAREHOUSE",
+            "INFORMATION_SECURITY",
+            "CONTROL_SYSTEM",
+            "USER_ADMIN"
+        };
+
+        foreach (var roleName in roles)
+        {
+            if (!await roleManager.RoleExistsAsync(roleName))
+            {
+                var roleResult = await roleManager.CreateAsync(
+                    new IdentityRole(roleName));
+
+                if (!roleResult.Succeeded)
+                {
+                    throw new InvalidOperationException(
+                        $"Die Benutzerrolle '{roleName}' konnte nicht " +
+                        "angelegt werden: " +
+                        string.Join("; ", roleResult.Errors.Select(x => x.Description)));
+                }
+            }
+        }
+
+        // Ein bereits vorhandener Demo-Datenbestand darf nicht produktiv
+        // erreichbar werden, auch nicht mit aktivem IP-Filter.
+        var existingUsers = await userManager.Users.ToListAsync();
+
+        foreach (var existingUser in existingUsers)
+        {
+            if (await userManager.CheckPasswordAsync(
+                existingUser, "Demo1234"))
+            {
+                throw new InvalidOperationException(
+                    "Mindestens ein Benutzer hat noch das bekannte " +
+                    "Demo-Initialpasswort. Produktivstart gesperrt.");
+            }
+        }
+
+        var administrators = await userManager.GetUsersInRoleAsync("USER_ADMIN");
+
+        if (!administrators.Any(x => x.IsActive))
+        {
+            var bootstrapUserName = builder.Configuration[
+                "SWN_WORKFLOW_BOOTSTRAP_USERNAME"];
+            var bootstrapPassword = builder.Configuration[
+                "SWN_WORKFLOW_BOOTSTRAP_PASSWORD"];
+
+            if (string.IsNullOrWhiteSpace(bootstrapUserName) ||
+                string.IsNullOrWhiteSpace(bootstrapPassword))
+            {
+                throw new InvalidOperationException(
+                    "Erster Produktivstart: " +
+                    "SWN_WORKFLOW_BOOTSTRAP_USERNAME und " +
+                    "SWN_WORKFLOW_BOOTSTRAP_PASSWORD muessen gesetzt sein.");
+            }
+
+            if (await userManager.FindByNameAsync(bootstrapUserName) is not null)
+            {
+                throw new InvalidOperationException(
+                    "Der Bootstrap-Benutzername ist bereits vergeben.");
+            }
+
+            var bootstrapAdmin = new ApplicationUser
+            {
+                UserName = bootstrapUserName,
+                DisplayName = "Workflow-Administration",
+                IsActive = true,
+                EmailConfirmed = true,
+                LockoutEnabled = true
+            };
+
+            var createResult = await userManager.CreateAsync(
+                bootstrapAdmin,
+                bootstrapPassword);
+
+            if (!createResult.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    "Bootstrap-Administration konnte nicht erstellt werden: " +
+                    string.Join("; ", createResult.Errors.Select(x => x.Description)));
+            }
+
+            foreach (var role in new[] { "USER_ADMIN", "ORGANIZATION" })
+            {
+                var assignResult = await userManager.AddToRoleAsync(
+                    bootstrapAdmin, role);
+
+                if (!assignResult.Succeeded)
+                {
+                    throw new InvalidOperationException(
+                        $"Rolle '{role}' konnte nicht zugewiesen werden: " +
+                        string.Join("; ", assignResult.Errors.Select(x => x.Description)));
+                }
+            }
+        }
+    }
 }
 
 app.Run();
