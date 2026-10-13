@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿
+using System.Net;
 using System.Text;
 using System.Xml.Linq;
 using Swn.Workflow.Application;
@@ -83,6 +84,7 @@ public sealed class ExchangeEwsEmailSender
 
         using var httpClient =
             CreateHttpClient(
+                ewsServiceUri,
                 credential);
 
         using var request =
@@ -247,8 +249,19 @@ public sealed class ExchangeEwsEmailSender
     }
 
     private static HttpClient CreateHttpClient(
+        Uri endpoint,
         NetworkCredential credential)
     {
+        // Nur NTLM fuer diesen EWS-Endpunkt
+        // anbieten, nicht Negotiate/Kerberos.
+        var credentials =
+            new CredentialCache();
+
+        credentials.Add(
+            endpoint,
+            "NTLM",
+            credential);
+
         var handler =
             new HttpClientHandler
             {
@@ -256,10 +269,12 @@ public sealed class ExchangeEwsEmailSender
                     false,
 
                 Credentials =
-                    credential,
+                    credentials,
 
+                // NTLM-Handshake ueber die
+                // Server-Challenge starten.
                 PreAuthenticate =
-                    true,
+                    false,
 
                 UseCookies =
                     false,

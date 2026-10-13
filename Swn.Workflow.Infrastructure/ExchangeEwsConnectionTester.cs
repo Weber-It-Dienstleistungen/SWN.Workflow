@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿
+using System.Net;
 using System.Text;
 using System.Xml.Linq;
 
@@ -207,6 +208,7 @@ public sealed class ExchangeEwsConnectionTester
 
         using var httpClient =
             CreateHttpClient(
+                endpoint,
                 credential);
 
         using var request =
@@ -395,7 +397,7 @@ public sealed class ExchangeEwsConnectionTester
                 document);
 
         if (string.IsNullOrWhiteSpace(
-                ewsUrl))
+            ewsUrl))
         {
             var serverMessage =
                 FindElementValue(
@@ -435,6 +437,7 @@ public sealed class ExchangeEwsConnectionTester
     {
         using var httpClient =
             CreateHttpClient(
+                ewsServiceUri,
                 credential);
 
         using var request =
@@ -541,8 +544,19 @@ public sealed class ExchangeEwsConnectionTester
     }
 
     private static HttpClient CreateHttpClient(
+        Uri endpoint,
         NetworkCredential credential)
     {
+        // Nur NTLM fuer genau diesen HTTPS-Endpunkt
+        // anbieten, nicht Negotiate/Kerberos.
+        var credentials =
+            new CredentialCache();
+
+        credentials.Add(
+            endpoint,
+            "NTLM",
+            credential);
+
         var handler =
             new HttpClientHandler
             {
@@ -550,10 +564,12 @@ public sealed class ExchangeEwsConnectionTester
                     false,
 
                 Credentials =
-                    credential,
+                    credentials,
 
+                // Der Server soll den NTLM-Handshake
+                // mit HTTP 401 beginnen.
                 PreAuthenticate =
-                    true,
+                    false,
 
                 UseCookies =
                     false,
